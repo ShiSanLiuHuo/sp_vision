@@ -1,9 +1,7 @@
 #include "cboard.hpp"
-#include <filesystem>
 
 #include "Eigen/src/Core/AssignEvaluator.h"
-#include "tools/math_tools.hpp"
-#include "tools/yaml.hpp"
+
 #include <cstdint>
 #include <iostream>
 
@@ -89,16 +87,16 @@ void CBoard::send(Command command) {
     msg.header = 's';
     msg.type   = 0xA0;
     GimbalControl msg_body;
-    msg_body.find_bools = command.control ? 1 : 0;
+    msg_body.find_bools = command.control ? 49 : 48; // '1' or '0'
     msg_body.yaw        = static_cast<float>(command.yaw);
     msg_body.pitch      = static_cast<float>(command.pitch);
     std::memcpy(msg.data, &msg_body, sizeof(GimbalControl));
     msg.tail = 'e';
 
-    // Copy msg to vector for serial write (avoids trivially copyable check)
-    std::vector<uint8_t> send_buffer(sizeof(Message_phoenix));
-    std::memcpy(send_buffer.data(), &msg, sizeof(Message_phoenix));
-    this->serial_.write(send_buffer);
+    auto code = this->serial_.write(std::move(msg));
+    if (!code) {
+        tools::logger()->warn("Serial write failed: {}", static_cast<int>(code.code()));
+    }
 }
 
 // 串口通信下已弃用
