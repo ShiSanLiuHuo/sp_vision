@@ -32,6 +32,12 @@ typedef struct Autoaim_s {
     float low_gimbal_yaw;
 } Autoaim;
 
+typedef struct GimbalControl_s {
+    char find_bools;
+    float yaw;
+    float pitch;
+} GimbalControl;
+
 typedef struct Message_phoenix_s {
     uint8_t header;
     uint8_t type;
@@ -71,8 +77,9 @@ private:
 
     int quaternion_canid_, bullet_speed_canid_, send_canid_;
 
+    std::string findFirstACMDevice();
 
-    std::string read_yaml(const std::string& config_path);
+    // std::string read_yaml(const std::string& config_path);
 
     void read_fun_1(Message_phoenix& msg);
 

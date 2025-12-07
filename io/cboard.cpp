@@ -1,4 +1,5 @@
 #include "cboard.hpp"
+#include <filesystem>
 
 #include "Eigen/src/Core/AssignEvaluator.h"
 #include "tools/math_tools.hpp"
@@ -16,7 +17,7 @@ CBoard::CBoard(const std::string& config_path):
     this->read_buffer_.resize(32);
     this->write_buffer_.resize(32);
     this->serial_ = serial_phoenix::Serial();
-    auto code     = this->serial_.open("/dev/ttyACM1", nullptr, 32);
+    auto code     = this->serial_.open(findFirstACMDevice(), nullptr, 32);
     if (!code) {
         tools::logger()->warn("[Cboard] Serial port not opened: {}", static_cast<int>(code.code()));
     }
@@ -81,28 +82,35 @@ Eigen::Quaterniond CBoard::imu_at(std::chrono::steady_clock::time_point timestam
     return q_c;
 }
 
+// 存在多写竞争，但是目前只有单线程写入需求
+// TODO: 改进为线程安全
 void CBoard::send(Command command) {
-    std::memcpy(this->write_buffer_.data(), &command.control, sizeof(bool));
-    std::memcpy(this->write_buffer_.data() + 1, &command.yaw, sizeof(float));
-    std::memcpy(this->write_buffer_.data() + 5, &command.pitch, sizeof(float));
-
-    this->serial_.write(this->write_buffer_);
+    Message_phoenix msg;
+    msg.header = 's';
+    msg.type   = 0xA0;
+    GimbalControl msg_body;
+    msg_body.find_bools = command.control ? 1 : 0;
+    msg_body.yaw        = static_cast<float>(command.yaw);
+    msg_body.pitch      = static_cast<float>(command.pitch);
+    std::memcpy(msg.data, &msg_body, sizeof(GimbalControl));
+    msg.tail = 'e';
+    this->serial_.write(msg);
 }
 
-// 实现方式有待改进
-std::string CBoard::read_yaml(const std::string& config_path) {
-    auto yaml = tools::load(config_path);
+// 串口通信下已弃用
+// std::string CBoard::read_yaml(const std::string& config_path) {
+//     auto yaml = tools::load(config_path);
 
-    quaternion_canid_   = tools::read<int>(yaml, "quaternion_canid");
-    bullet_speed_canid_ = tools::read<int>(yaml, "bullet_speed_canid");
-    send_canid_         = tools::read<int>(yaml, "send_canid");
+//     quaternion_canid_   = tools::read<int>(yaml, "quaternion_canid");
+//     bullet_speed_canid_ = tools::read<int>(yaml, "bullet_speed_canid");
+//     send_canid_         = tools::read<int>(yaml, "send_canid");
 
-    if (!yaml["can_interface"]) {
-        throw std::runtime_error("Missing 'can_interface' in YAML configuration.");
-    }
+//     if (!yaml["can_interface"]) {
+//         throw std::runtime_error("Missing 'can_interface' in YAML configuration.");
+//     }
 
-    return yaml["can_interface"].as<std::string>();
-}
+//     return yaml["can_interface"].as<std::string>();
+// }
 
 void CBoard::read_fun_1(Message_phoenix& msg) {
     auto timestamp = std::chrono::steady_clock::now();
@@ -118,4 +126,14 @@ void CBoard::read_fun_1(Message_phoenix& msg) {
     queue_.push({ q, timestamp });
 }
 
+std::string CBoard::findFirstACMDevice() {
+    const std::string dev_path = "/dev/";
+    for (const auto& entry: std::filesystem::directory_iterator(dev_path)) {
+        if (entry.path().filename().string().find("ttyACM") != std::string::npos) {
+            std::cout << "find ACM device: " << entry.path().string() << std::endl;
+            return entry.path().string();
+        }
+    }
+    throw std::runtime_error("No /dev/ttyACM* device found.");
+}
 } // namespace io
