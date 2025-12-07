@@ -94,7 +94,11 @@ void CBoard::send(Command command) {
     msg_body.pitch      = static_cast<float>(command.pitch);
     std::memcpy(msg.data, &msg_body, sizeof(GimbalControl));
     msg.tail = 'e';
-    this->serial_.write(msg);
+
+    // Copy msg to vector for serial write (avoids trivially copyable check)
+    std::vector<uint8_t> send_buffer(sizeof(Message_phoenix));
+    std::memcpy(send_buffer.data(), &msg, sizeof(Message_phoenix));
+    this->serial_.write(send_buffer);
 }
 
 // 串口通信下已弃用
