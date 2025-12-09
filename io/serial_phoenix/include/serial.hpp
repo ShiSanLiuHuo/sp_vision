@@ -54,6 +54,14 @@ struct SerialCode {
     constexpr Value code() const noexcept {
         return value;
     }
+
+    constexpr int int_code() const noexcept {
+        return static_cast<int>(value);
+    }
+
+    constexpr bool operator==(const bool& other) const noexcept {
+        return (value == SerialCode::Value::OK) == other;
+    }
 };
 
 /**
