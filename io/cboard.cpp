@@ -9,13 +9,18 @@ namespace io {
 CBoard::CBoard(const std::string& config_path):
     mode(Mode::idle),
     shoot_mode(ShootMode::left_shoot),
-    bullet_speed(0),
+    bullet_speed(21.0),
     queue_(5000) {
+    auto yaml          = YAML::LoadFile(config_path);
+    this->bullet_speed = yaml["bullet_speed"].as<double>();
+
     tools::logger()->info("[Cboard] Waiting for q...");
+
     this->read_buffer_.resize(32);
     this->write_buffer_.resize(32);
     this->serial_ = serial_phoenix::Serial();
-    auto code     = this->serial_.open(findFirstACMDevice(), nullptr, 32);
+
+    auto code = this->serial_.open(findFirstACMDevice(), nullptr, 32);
     if (!code) {
         tools::logger()->warn("[Cboard] Serial port not opened: {}", static_cast<int>(code.code()));
     }

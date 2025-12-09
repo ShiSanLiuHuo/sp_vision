@@ -6,6 +6,7 @@
 #include <functional>
 #include <string>
 #include <vector>
+#include <yaml-cpp/yaml.h>
 
 #include "io/command.hpp"
 #include "io/socketcan.hpp"
@@ -21,6 +22,7 @@ const std::vector<std::string> MODES = { "idle", "auto_aim", "small_buff", "big_
 // 哨兵专有
 enum ShootMode { left_shoot, right_shoot, both_shoot };
 const std::vector<std::string> SHOOT_MODES = { "left_shoot", "right_shoot", "both_shoot" };
+
 #pragma pack(1)
 
 typedef struct Autoaim_s {
