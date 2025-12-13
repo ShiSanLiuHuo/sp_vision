@@ -20,7 +20,6 @@
 #include "tools/math_tools.hpp"
 #include "tools/plotter.hpp"
 #include "tools/recorder.hpp"
-#include "tools/yaml.hpp"
 
 using namespace std::chrono;
 
@@ -57,11 +56,6 @@ int main(int argc, char* argv[]) {
     auto last_mode  = io::Mode::idle;
     int frame_count = 0;
     io::Command last_command;
-
-    // bool if_save_record = false;
-    // auto yaml           = tools::load(config_path);
-
-    // if_save_record = tools::read<bool>(yaml, "if_save_record");
 
     while (!exiter.exit()) {
         camera.read(img, t);
@@ -174,7 +168,8 @@ int main(int argc, char* argv[]) {
             data["h"]         = x[10];
             data["last_id"]   = target.last_id;
 
-            auto ekf                    = target.ekf();
+            auto ekf = target.ekf();
+
             data["residual_yaw"]        = ekf.data.at("residual_yaw");
             data["residual_pitch"]      = ekf.data.at("residual_pitch");
             data["residual_distance"]   = ekf.data.at("residual_distance");
@@ -196,9 +191,6 @@ int main(int argc, char* argv[]) {
 
         cboard.send(command);
         frame_count++;
-        // if (if_save_record) {
-        //     recorder.record(img, q, t);
-        // }
     }
 
     return 0;

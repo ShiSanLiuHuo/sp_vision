@@ -97,6 +97,7 @@ void Gimbal::send(
     float pitch_vel,
     float pitch_acc
 ) {
+    // 0: 不控制, 1: 控制云台但不开火，2: 控制云台且开火
     tx_data_.mode      = control ? (fire ? 2 : 1) : 0;
     tx_data_.yaw       = yaw;
     tx_data_.yaw_vel   = yaw_vel;
