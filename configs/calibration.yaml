@@ -1,13 +1,20 @@
 pattern_cols: 10
 pattern_rows: 7
-center_distance_mm: 40
+center_distance_mm: 100
+
+camera_matrix: [2084.3160887394706, 0.0, 631.1834112015235, 0.0, 2080.472663597974, 526.4361796626856, 0.0, 0.0, 1.0]
+distort_coeffs: [-0.06755356655189967, 0.3713144200519689, 0.0010583868158896127, 0.0005530478618374709, 0.0]
+
+# Phoenix 上报的 yaw/pitch 单位（capture/cboard 使用）：rad 或 deg
+phoenix_angle_unit: rad
 
 R_gimbal2imubody: [1, 0, 0, 0, 1, 0,  0, 0, 1]
 
-camera_name: "hikrobot"
+camera_name: "mindvision"
 exposure_ms: 3
+gamma: 1.0  # 伽马校正
 gain: 10.0
-vid_pid: "2bdf:0001"
+vid_pid: "f622:0001"
 
 #####-----cboard参数-----#####
 quaternion_canid: 0x01

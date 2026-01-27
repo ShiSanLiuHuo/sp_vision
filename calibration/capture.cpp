@@ -3,6 +3,7 @@
 #include <filesystem>
 #include <fstream>
 #include <opencv2/opencv.hpp>
+#include <yaml-cpp/yaml.h>
 
 #include "io/camera.hpp"
 #include "io/cboard.hpp"
@@ -27,6 +28,50 @@ void write_q(const std::string q_path, const Eigen::Quaterniond & q)
 void capture_loop(
   const std::string & config_path, const std::string & can, const std::string & output_folder)
 {
+  auto yaml = YAML::LoadFile(config_path);
+  auto pattern_cols = yaml["pattern_cols"].as<int>();
+  auto pattern_rows = yaml["pattern_rows"].as<int>();
+  cv::Size pattern_size(pattern_cols, pattern_rows);
+
+  auto to_gray8 = [](const cv::Mat & src) {
+    cv::Mat gray;
+    if (src.channels() == 3)
+      cv::cvtColor(src, gray, cv::COLOR_BGR2GRAY);
+    else if (src.channels() == 1)
+      gray = src;
+    else
+      src.convertTo(gray, CV_8U);
+    if (gray.depth() != CV_8U)
+      gray.convertTo(gray, CV_8U);
+    return gray;
+  };
+
+  auto find_chessboard_robust = [](const cv::Mat & gray, const cv::Size & sz,
+                                  std::vector<cv::Point2f> & corners) {
+    corners.clear();
+    bool ok = false;
+    try {
+      ok = cv::findChessboardCornersSB(gray, sz, corners);
+    } catch (const cv::Exception &) {
+      ok = false;
+    }
+    if (!ok) {
+      try {
+        ok = cv::findChessboardCorners(
+          gray, sz, corners,
+          cv::CALIB_CB_ADAPTIVE_THRESH | cv::CALIB_CB_NORMALIZE_IMAGE);
+      } catch (const cv::Exception &) {
+        ok = false;
+      }
+    }
+    if (ok) {
+      cv::cornerSubPix(
+        gray, corners, cv::Size(11, 11), cv::Size(-1, -1),
+        cv::TermCriteria(cv::TermCriteria::COUNT + cv::TermCriteria::EPS, 30, 0.1));
+    }
+    return ok;
+  };
+
   io::CBoard cboard(config_path);
   io::Camera camera(config_path);
   cv::Mat img;
@@ -44,9 +89,22 @@ void capture_loop(
     tools::draw_text(img_with_ypr, fmt::format("Y {:.2f}", zyx[1]), {40, 80}, {0, 0, 255});
     tools::draw_text(img_with_ypr, fmt::format("X {:.2f}", zyx[2]), {40, 120}, {0, 0, 255});
 
+    // 统一转成 8-bit 灰度
+    cv::Mat gray = to_gray8(img);
+
+    // 先尝试棋盘格（你这张图就是棋盘格），失败再回退到圆点阵列
     std::vector<cv::Point2f> centers_2d;
-    auto success = cv::findCirclesGrid(img, cv::Size(10, 7), centers_2d);  // 默认是对称圆点图案
-    cv::drawChessboardCorners(img_with_ypr, cv::Size(10, 7), centers_2d, success);  // 显示识别结果
+    bool success = find_chessboard_robust(gray, pattern_size, centers_2d);
+    if (!success) {
+      try {
+        success = cv::findCirclesGrid(gray, pattern_size, centers_2d);
+      } catch (const cv::Exception & e) {
+        tools::logger()->error("findCirclesGrid threw exception: {}", e.what());
+        success = false;
+      }
+    }
+
+    cv::drawChessboardCorners(img_with_ypr, pattern_size, centers_2d, success);  // 显示识别结果
     cv::resize(img_with_ypr, img_with_ypr, {}, 0.5, 0.5);  // 显示时缩小图片尺寸
 
     // 按“s”保存图片和对应四元数，按“q”退出程序
@@ -83,7 +141,10 @@ int main(int argc, char * argv[])
   // 新建输出文件夹
   std::filesystem::create_directory(output_folder);
 
-  tools::logger()->info("默认标定板尺寸为10列7行");
+  auto yaml = YAML::LoadFile(config_path);
+  auto pattern_cols = yaml["pattern_cols"].as<int>();
+  auto pattern_rows = yaml["pattern_rows"].as<int>();
+  tools::logger()->info("标定板尺寸为{}列{}行", pattern_cols, pattern_rows);
   // 主循环，保存图片和对应四元数
   capture_loop(config_path, "can0", output_folder);
 

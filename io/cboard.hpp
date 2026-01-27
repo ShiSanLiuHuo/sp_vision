@@ -32,12 +32,15 @@ typedef struct Autoaim_s {
     uint8_t mode;
     uint8_t rune_flag;
     float low_gimbal_yaw;
+    
 } Autoaim;
 
 typedef struct GimbalControl_s {
     char find_bools;
     float yaw;
     float pitch;
+    float yaw_vel;
+    float pitch_vel;
 } GimbalControl;
 
 typedef struct Message_phoenix_s {
@@ -78,6 +81,10 @@ private:
     IMUData data_behind_;
 
     int quaternion_canid_, bullet_speed_canid_, send_canid_;
+
+    // Phoenix 下位机上报的 yaw/pitch 单位；默认按 rad 解析。
+    // 可在 yaml 里配置：phoenix_angle_unit: deg|rad
+    bool phoenix_angles_in_degrees_ = false;
 
     std::string findFirstACMDevice();
 

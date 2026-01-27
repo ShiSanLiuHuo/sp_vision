@@ -12,7 +12,13 @@ CBoard::CBoard(const std::string& config_path):
     bullet_speed(21.0),
     queue_(5000) {
     auto yaml          = YAML::LoadFile(config_path);
-    this->bullet_speed = yaml["bullet_speed"].as<double>();
+
+
+    if (yaml["phoenix_angle_unit"]) {
+        auto unit = yaml["phoenix_angle_unit"].as<std::string>();
+        for (auto& c: unit) c = static_cast<char>(std::tolower(c));
+        phoenix_angles_in_degrees_ = (unit == "deg" || unit == "degree" || unit == "degrees");
+    }
 
     tools::logger()->info("[Cboard] Waiting for q...");
 
@@ -25,8 +31,9 @@ CBoard::CBoard(const std::string& config_path):
         tools::logger()->warn("[Cboard] Serial port not opened: {}", static_cast<int>(code.code()));
     }
     this->start();
-    queue_.pop(data_ahead_);
-    queue_.pop(data_behind_);
+    // Use default values to prevent blocking startup if serial is silent
+    data_ahead_ = { Eigen::Quaterniond::Identity(), std::chrono::steady_clock::now() };
+    data_behind_ = data_ahead_;
     tools::logger()->info("[Cboard] Opened.");
 }
 
@@ -95,6 +102,8 @@ void CBoard::send(Command command) {
     msg_body.find_bools = command.control ? 49 : 48; // '1' or '0'
     msg_body.yaw        = static_cast<float>(command.yaw);
     msg_body.pitch      = static_cast<float>(command.pitch);
+    msg_body.yaw_vel    = static_cast<float>(command.yaw_vel);
+    msg_body.pitch_vel  = static_cast<float>(command.pitch_vel);
     std::memcpy(msg.data, &msg_body, sizeof(GimbalControl));
     msg.tail = 'e';
 
@@ -123,8 +132,25 @@ void CBoard::read_fun_1(Message_phoenix& msg) {
     auto timestamp = std::chrono::steady_clock::now();
 
     Autoaim_s data = reinterpret_cast<Autoaim_s&>(msg.data);
-    float yaw      = data.yaw;
-    float pitch    = data.pitch;
+    double yaw      = data.yaw;
+    double pitch    = data.pitch;
+
+    // // 记录原始读取值，便于排查数据格式/协议问题
+    // tools::logger()->debug("[CBoard] raw angles: yaw={}, pitch={}, degrees_flag={}", yaw, pitch,
+    //                       phoenix_angles_in_degrees_);
+
+    // 如果为度单位则转为弧度
+    if (phoenix_angles_in_degrees_) {
+        constexpr double kDeg2Rad = M_PI / 180.0;
+        yaw *= kDeg2Rad;
+        pitch *= kDeg2Rad;
+    }
+
+    // 合法性检查：排除 NaN/Inf 或极端错误值，避免产生非法四元数
+    if (!std::isfinite(yaw) || !std::isfinite(pitch) || std::abs(yaw) > 1e4 || std::abs(pitch) > 1e4) {
+        tools::logger()->error("[CBoard] Invalid IMU angles, skipping sample: yaw={}, pitch={}", yaw, pitch);
+        return;
+    }
 
     // std::cout << "Yaw: " << yaw << ", Pitch: " << pitch << std::endl;
     Eigen::AngleAxisd yaw_aa(yaw, Eigen::Vector3d::UnitZ());

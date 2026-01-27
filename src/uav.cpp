@@ -5,6 +5,7 @@
 #include "io/camera.hpp"
 #include "io/dm_imu/dm_imu.hpp"
 #include "tasks/auto_aim/aimer.hpp"
+#include "tasks/auto_aim/planner/planner.hpp"
 #include "tasks/auto_aim/detector.hpp"
 #include "tasks/auto_aim/shooter.hpp"
 #include "tasks/auto_aim/solver.hpp"
@@ -48,6 +49,7 @@ int main(int argc, char * argv[])
   auto_aim::Solver solver(config_path);
   // auto_aim::YOLO yolo(config_path);
   auto_aim::Tracker tracker(config_path, solver);
+  auto_aim::Planner planner(config_path);
   auto_aim::Aimer aimer(config_path);
   auto_aim::Shooter shooter(config_path);
 
@@ -81,13 +83,23 @@ int main(int argc, char * argv[])
       Eigen::Vector3d ypr = tools::eulers(solver.R_gimbal2world(), 2, 1, 0);
 
       auto armors = detector.detect(img);
-
       auto targets = tracker.track(armors, t);
 
       auto command = aimer.aim(targets, t, cboard.bullet_speed);
 
+      if (!targets.empty()) {
+        auto plan = planner.plan(targets.front(), cboard.bullet_speed);
+        if (plan.control) {
+          command.yaw = plan.yaw;
+          command.pitch = plan.pitch;
+          command.yaw_vel = plan.yaw_vel;
+          command.pitch_vel = plan.pitch_vel;
+        }
+      }
+
       command.shoot = shooter.shoot(command, aimer, targets, ypr);
 
+      cboard.send(command);
       cboard.send(command);
     }
 

@@ -9,6 +9,7 @@
 #include "io/camera.hpp"
 #include "io/cboard.hpp"
 #include "tasks/auto_aim/aimer.hpp"
+#include "tasks/auto_aim/planner/planner.hpp"
 #include "tasks/auto_aim/multithread/commandgener.hpp"
 #include "tasks/auto_aim/shooter.hpp"
 #include "tasks/auto_aim/solver.hpp"
@@ -45,6 +46,7 @@ int main(int argc, char* argv[]) {
     auto_aim::YOLO detector(config_path, false);
     auto_aim::Solver solver(config_path);
     auto_aim::Tracker tracker(config_path, solver);
+    auto_aim::Planner planner(config_path);
     auto_aim::Aimer aimer(config_path);
     auto_aim::Shooter shooter(config_path);
 
@@ -56,6 +58,10 @@ int main(int argc, char* argv[]) {
     auto last_mode  = io::Mode::idle;
     int frame_count = 0;
     io::Command last_command;
+    int total_armors = 0;  // 总检测到的装甲板数量
+    int detected_frames = 0;  // 检测到装甲板的帧数
+    
+
 
     while (!exiter.exit()) {
         camera.read(img, t);
@@ -73,10 +79,26 @@ int main(int argc, char* argv[]) {
 
         auto yolo_start    = std::chrono::steady_clock::now();
         auto armors        = detector.detect(img);
+        total_armors += armors.size();  // 累加检测到的装甲板
+        if (!armors.empty()) {
+            detected_frames++;  // 累加检测成功的帧数
+        }
         auto tracker_start = std::chrono::steady_clock::now();
         auto targets       = tracker.track(armors, t);
         auto aimer_start   = std::chrono::steady_clock::now();
         auto command       = aimer.aim(targets, t, cboard.bullet_speed);
+        
+        if (!targets.empty()) {
+            auto plan = planner.plan(targets.front(), cboard.bullet_speed);
+            if (plan.control) {
+                // 使用 MPC (Planner) 的结果（位置+速度）覆盖 Aimer 的结果
+                command.yaw       = plan.yaw;
+                command.pitch     = plan.pitch;
+                command.yaw_vel   = plan.yaw_vel;
+                command.pitch_vel = plan.pitch_vel;
+            }
+        }
+
         auto finish        = std::chrono::steady_clock::now();
 
         if (!targets.empty() && aimer.debug_aim_point.valid
@@ -144,7 +166,12 @@ int main(int argc, char* argv[]) {
                     solver.reproject_armor(xyza.head(3), xyza[3], target.armor_type, target.name);
                 tools::draw_points(img, image_points, { 0, 255, 0 });
             }
-
+            Eigen::VectorXd x = target.ekf_x();
+            std::vector<cv::Point3f> center_pt = {{static_cast<float>(x[0]), static_cast<float>(x[2]), static_cast<float>(x[4])}};
+            auto center_img_pts = solver.world2pixel(center_pt);
+            if (!center_img_pts.empty()) {
+                cv::circle(img, center_img_pts[0], 5, {255, 255, 0}, -1); // Cyan circle
+            }
             auto aim_point           = aimer.debug_aim_point;
             Eigen::Vector4d aim_xyza = aim_point.xyza;
             auto image_points =
@@ -154,7 +181,6 @@ int main(int argc, char* argv[]) {
                 tools::draw_points(img, image_points, { 0, 0, 255 });
             }
 
-            Eigen::VectorXd x = target.ekf_x();
             data["x"]         = x[0];
             data["vx"]        = x[1];
             data["y"]         = x[2];
@@ -183,14 +209,24 @@ int main(int argc, char* argv[]) {
 
         plotter.plot(data);
 
-        cv::resize(img, img, {}, 0.5, 0.5);
-        cv::imshow("reprojection", img);
+        cv::resize(img, img, {}, 0.8, 0.8);
+        // cv::imshow("reprojection", img);
         auto key = cv::waitKey(1);
         if (key == 'q')
             break;
 
         cboard.send(command);
         frame_count++;
+    }
+        // 在程序结束时输出识别率
+    if (frame_count > 0) {
+        double avg_armors_per_frame = static_cast<double>(total_armors) / frame_count;
+        double detection_rate = 100.0 * detected_frames / frame_count;
+        tools::logger()->info(
+            "Recognition Summary: Total frames: {}, Total armors detected: {}, "
+            "Average armors per frame: {:.2f}, Detection rate: {:.2f}% ({}/{} frames)",
+            frame_count, total_armors, avg_armors_per_frame, detection_rate, detected_frames, frame_count
+        );
     }
 
     return 0;

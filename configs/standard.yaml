@@ -51,10 +51,10 @@ second_tolerance: 2 # 远距离射击容差，degree
 judge_distance: 2 #距离判断阈值
 auto_fire: true # 是否由自瞄控制射击
 
-camera_name: "hikrobot"
+camera_name: "mindvision"
 exposure_ms: 2.5
 gain: 16.9
-vid_pid: "2bdf:0001"
+vid_pid: "f622:0001"
 
 #  1  0  0
 #  0  1  0
