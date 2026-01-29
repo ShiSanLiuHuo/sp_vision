@@ -1,5 +1,5 @@
-enemy_color: "red"
-# enemy_color: "blue"
+# enemy_color: "red"
+enemy_color: "blue"
 
 #####-----神经网络参数-----#####
 yolo_name: yolov5
@@ -7,8 +7,8 @@ classify_model: assets/tiny_resnet.onnx
 yolo11_model_path: assets/yolo11.xml
 yolov8_model_path: assets/yolov8.xml
 yolov5_model_path: assets/yolov5.xml
-device: GPU
-min_confidence: 0.8
+device: CPU
+min_confidence: 0.65
 use_traditional: true
 
 #####-----ROI-----#####
@@ -30,7 +30,6 @@ min_armor_ratio: 1
 max_armor_ratio: 5
 max_side_ratio: 1.5
 max_rectangular_error: 25 # degree
-min_confidence: 0.8
 
 #####-----tracker参数-----#####
 min_detect_count: 5
@@ -38,13 +37,13 @@ max_temp_lost_count: 15
 outpost_max_temp_lost_count: 75
 
 #####-----aimer参数-----#####
-yaw_offset: -2 # degree -2.5
-pitch_offset: 0 # degree 2
-comming_angle: 60 # degree
+yaw_offset: 2   # degree 2
+pitch_offset: 6.5 # degree 2
+comming_angle: 55 # degree
 leaving_angle: 20 # degree
-decision_speed: 8 # rad/s
-high_speed_delay_time: 0.015 # s
-low_speed_delay_time: 0.015 # s
+decision_speed: 7 # rad/s
+high_speed_delay_time: 0.0 # s
+low_speed_delay_time: 0.0 # s planner use this value
 
 #####-----shooter参数-----#####
 first_tolerance: 3 # 近距离射击容差，degree
@@ -52,24 +51,40 @@ second_tolerance: 2 # 远距离射击容差，degree
 judge_distance: 2 #距离判断阈值
 auto_fire: true # 是否由自瞄控制射击
 
-camera_name: "hikrobot"
-exposure_ms: 2
-gain: 16
-vid_pid: "2bdf:0001"
+# camera_name: "mindvision"
+# exposure_ms: 1.5
+# gamma: 1.0
+# gain: 5.0   
+# vid_pid: "f622:0001"
+
+camera_name: "mindvision"
+exposure_ms: 1.3
+gamma: 0.7
+gain: 20.0   
+vid_pid: "f622:0001"
 
 #  1  0  0
 #  0  1  0
 #  0  0  1
-
 R_gimbal2imubody: [1, 0, 0, 0, 1, 0, 0, 0, 1]
 
-# 重投影误差: 0.3145px
-camera_matrix: [1851.7070167840545, 0, 721.12585328714192, 0, 1851.8175594364079, 571.69879709276688, 0, 0, 1]
-distort_coeffs: [-0.093662536083526302, 0.18945726820633155, -0.00040424349861928674, -0.0040568403852123142, 0]
+# 重投影误差: 0.1820px
+camera_matrix: [2085.8518909137497, 0.0, 636.8099094845275, 0.0, 2082.84996709917, 525.701630438037, 0.0, 0.0, 1.0]
+distort_coeffs: [-0.059448299297612375, 0.32250412735017253, 0.0015427764703439568, 0.001518245596842894, 0.0]
 
-# 相机同理想情况的偏角: yaw-1.61 pitch-0.82 roll-0.61 degree
-R_camera2gimbal: [0.02823004230930648, -0.014076983590428133, 0.99950232778328707, -0.99954530259354468, -0.010995644138609872, 0.028076393521179785, 0.010594940981141165, -0.99984045444409364, -0.014380990321749998]
-t_camera2gimbal: [0.045517325957791413, 0.10544338092767802, 0.034649710880185793]
+
+# 相机同理想情况的偏角: yaw1.44 pitch-7.28 roll0.96 degree
+# 标定板到世界坐标系原点的水平距离: 1.13 m
+# 标定板同竖直摆放时的偏角: yaw7.61 pitch13.92 roll-0.46 degree
+# R_camera2gimbal: [0.01928451708725664, 0.00012696140743255463, 0.99981402834802846, -0.99981344688553653, -0.0010834913551969569, 0.019284643459122196, 0.0010857382619952124, -0.99999940496346484, 0.00010604311483339372]
+# t_camera2gimbal: [-0.068315446649358236, 0.03039891226054374, 0.024941658436299224]
+
+# original setup don't change
+
+
+R_camera2gimbal: [-0.027182119030230909, -0.12616154330853446, 0.99163723074269183, -0.99949106557517331, 0.019998323121329122, -0.024853106601381177, -0.016695575474690555, -0.99180811252093692, -0.12664093215554434]
+# t_camera2gimbal: [0.13160669975045827, 0.10377721766577375, 0.024908271912914642]
+t_camera2gimbal: [0.1160669975045827, 0.075721766577375, 0.0808271912914642]
 
 #####-----cboard参数-----#####
 quaternion_canid: 0x100
@@ -79,21 +94,27 @@ can_interface: "can0"
 
 #####-----gimbal参数-----#####
 com_port: "/dev/gimbal"
+yaw_kp: 0
+yaw_kd: 0
+pitch_kp: 0
+pitch_kd: 0
 
 #####-----planner-----#####
-fire_thresh: 0.003
+fire_thresh: 0.0035
 
 max_yaw_acc: 50
-Q_yaw: [9e6, 0]
+Q_yaw: [8e6, 0]
 R_yaw: [1]
 
 max_pitch_acc: 100
-Q_pitch: [9e6,0]
+Q_pitch: [9e6, 0]
 R_pitch: [1]
 
 #####-----buff_detector参数-----#####
 model: "assets/yolo11_buff_int8.xml"
 
 #####-----buff_aimer参数-----#####
-fire_gap_time: 0.520   # s
-predict_time: 0.100     # s
+fire_gap_time: 0.700   # s
+predict_time: 0.120     # s
+
+bullet_speed: 25.0  # m/s

@@ -44,3 +44,31 @@ pkill -f watchdog.sh
 pkill -f standard
 # 或者在 screen 会话中按 Ctrl+C
 ```
+### 在 watchdog.sh 中添加 ROS 2 环境变量
+在 `watchdog.sh` 脚本的开头部分添加以下内容，以确保
+# Source ROS 2 environment (Jazzy)  记得修改为你的 ROS 2 版本路径
+
+if [ -f /opt/ros/jazzy/setup.bash ]; then
+    source /opt/ros/jazzy/setup.bash
+fi
+
+### 修改开机自启动后，请重新执行以下命令以应用更改：
+```bash
+sudo systemctl daemon-reload
+sudo systemctl restart sp_vision.service
+# 验证服务状态
+sudo systemctl status sp_vision.service
+```
+
+### 修改源代码后记得重新编译项目：
+```bash
+mkdir -p build
+cd build
+cmake ..
+make standard_mpc_se -j4
+### 这里以 standard_mpc_se 为例，根据需要编译相应的可执行文件
+```
+```bash
+## 或者直接
+cmake --build build 
+```

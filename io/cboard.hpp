@@ -32,7 +32,7 @@ typedef struct Autoaim_s {
     uint8_t mode;
     uint8_t rune_flag;
     float low_gimbal_yaw;
-    
+    float bullet_speed;
 } Autoaim;
 
 typedef struct GimbalControl_s {
@@ -41,6 +41,7 @@ typedef struct GimbalControl_s {
     float pitch;
     float yaw_vel;
     float pitch_vel;
+    char fire_bools;
 } GimbalControl;
 
 typedef struct Message_phoenix_s {

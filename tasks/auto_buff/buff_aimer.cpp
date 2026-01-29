@@ -21,7 +21,8 @@ io::Command Aimer::aim(
   auto_buff::Target & target, std::chrono::steady_clock::time_point & timestamp,
   double bullet_speed, bool to_now)
 {
-  io::Command command = {false, false, 0, 0};
+  // io::Command command = {control, shoot, yaw, pitch, yaw_vel, pitch_vel, horizon_distance, distance};
+  io::Command command = {false, false, 0, 0, 0, 0, 0, 0};
   if (target.is_unsolve()) return command;
 
   // 如果子弹速度小于10，将其设为24
@@ -33,8 +34,8 @@ io::Command Aimer::aim(
   auto future = to_now ? (detect_now_gap + predict_time_) : 0.1 + predict_time_;
   double yaw, pitch;
 
-  bool angle_changed =
-    std::abs(last_yaw_ - yaw) > 5 / 57.3 || std::abs(last_pitch_ - pitch) > 5 / 57.3;
+  // bool angle_changed =
+  std::abs(last_yaw_ - yaw) > 5 / 57.3 || std::abs(last_pitch_ - pitch) > 5 / 57.3;
   if (get_send_angle(target, future, bullet_speed, to_now, yaw, pitch)) {
     command.yaw = yaw;
     command.pitch = -pitch;  //世界坐标系下的pitch向上为负

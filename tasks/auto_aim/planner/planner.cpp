@@ -95,7 +95,7 @@ Plan Planner::plan(Target target, double bullet_speed)
 
 Plan Planner::plan(std::optional<Target> target, double bullet_speed)
 {
-  if (!target.has_value()) return {false};
+  if (!target.has_value()) return {false, false, 0, 0, 0, 0, 0, 0, 0, 0};
 
   double delay_time =
     std::abs(target->ekf_x()[7]) > decision_speed_ ? high_speed_delay_time_ : low_speed_delay_time_;
@@ -155,8 +155,8 @@ void Planner::setup_pitch_solver(const std::string & config_path)
 
 Eigen::Matrix<double, 2, 1> Planner::aim(const Target & target, double bullet_speed)
 {
-  Eigen::Vector3d xyz;
-  double yaw;
+  Eigen::Vector3d xyz = Eigen::Vector3d::Zero();
+  double yaw = 0;
   auto min_dist = 1e10;
 
   for (auto & xyza : target.armor_xyza_list()) {

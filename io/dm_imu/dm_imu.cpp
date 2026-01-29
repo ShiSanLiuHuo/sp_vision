@@ -1,6 +1,7 @@
 #include "dm_imu.hpp"
 
 #include <atomic>
+#include <cstring>
 #include <chrono>
 #include <cstdint>
 #include <iostream>
@@ -74,19 +75,19 @@ void DM_IMU::get_imu_data_thread()
       serial_.read((uint8_t *)(&receive_data.accx_u32), 57 - 4);
 
       if (tools::get_crc16((uint8_t *)(&receive_data.FrameHeader1), 16) == receive_data.crc1) {
-        data.accx = *((float *)(&receive_data.accx_u32));
-        data.accy = *((float *)(&receive_data.accy_u32));
-        data.accz = *((float *)(&receive_data.accz_u32));
+        std::memcpy(&data.accx, &receive_data.accx_u32, sizeof(float));
+        std::memcpy(&data.accy, &receive_data.accy_u32, sizeof(float));
+        std::memcpy(&data.accz, &receive_data.accz_u32, sizeof(float));
       }
       if (tools::get_crc16((uint8_t *)(&receive_data.FrameHeader2), 16) == receive_data.crc2) {
-        data.gyrox = *((float *)(&receive_data.gyrox_u32));
-        data.gyroy = *((float *)(&receive_data.gyroy_u32));
-        data.gyroz = *((float *)(&receive_data.gyroz_u32));
+        std::memcpy(&data.gyrox, &receive_data.gyrox_u32, sizeof(float));
+        std::memcpy(&data.gyroy, &receive_data.gyroy_u32, sizeof(float));
+        std::memcpy(&data.gyroz, &receive_data.gyroz_u32, sizeof(float));
       }
       if (tools::get_crc16((uint8_t *)(&receive_data.FrameHeader3), 16) == receive_data.crc3) {
-        data.roll = *((float *)(&receive_data.roll_u32));
-        data.pitch = *((float *)(&receive_data.pitch_u32));
-        data.yaw = *((float *)(&receive_data.yaw_u32));
+        std::memcpy(&data.roll, &receive_data.roll_u32, sizeof(float));
+        std::memcpy(&data.pitch, &receive_data.pitch_u32, sizeof(float));
+        std::memcpy(&data.yaw, &receive_data.yaw_u32, sizeof(float));
         // tools::logger()->debug(
         //   "yaw: {:.2f}, pitch: {:.2f}, roll: {:.2f}", static_cast<double>(data.yaw),
         //   static_cast<double>(data.pitch), static_cast<double>(data.roll));

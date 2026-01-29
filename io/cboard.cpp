@@ -7,9 +7,9 @@
 
 namespace io {
 CBoard::CBoard(const std::string& config_path):
+    bullet_speed(21.0),
     mode(Mode::idle),
     shoot_mode(ShootMode::left_shoot),
-    bullet_speed(21.0),
     queue_(5000) {
     auto yaml          = YAML::LoadFile(config_path);
 
@@ -104,12 +104,25 @@ void CBoard::send(Command command) {
     msg_body.pitch      = static_cast<float>(command.pitch);
     msg_body.yaw_vel    = static_cast<float>(command.yaw_vel);
     msg_body.pitch_vel  = static_cast<float>(command.pitch_vel);
+    msg_body.fire_bools = command.shoot ? 49 : 48;   // '1' or '0'
     std::memcpy(msg.data, &msg_body, sizeof(GimbalControl));
     msg.tail = 'e';
 
     auto code = this->serial_.write(std::move(msg));
+    static int fail_count = 0;
     if (!code) {
-        tools::logger()->warn("Serial write failed: {}", static_cast<int>(code.code()));
+        int err_code = static_cast<int>(code.code());
+        tools::logger()->warn("Serial write failed: {}", err_code);
+        
+        // Error code 40 (WRITE_FAIL) usually implies a disconnected or broken device.
+        // If it happens continuously, we should exit to let watchdog restart the process.
+        fail_count++;
+        if (fail_count > 5 || err_code == 40) {
+            tools::logger()->error("Serial write failed too many times or critical error. Exiting...");
+            std::exit(1); 
+        }
+    } else {
+        fail_count = 0;
     }
 }
 
@@ -132,6 +145,7 @@ void CBoard::read_fun_1(Message_phoenix& msg) {
     auto timestamp = std::chrono::steady_clock::now();
 
     Autoaim_s data = reinterpret_cast<Autoaim_s&>(msg.data);
+    this->bullet_speed = data.bullet_speed;
     double yaw      = data.yaw;
     double pitch    = data.pitch;
 

@@ -57,7 +57,7 @@ int main(int argc, char* argv[]) {
     auto mode       = io::Mode::idle;
     auto last_mode  = io::Mode::idle;
     int frame_count = 0;
-    io::Command last_command = {false, false, 0.0, 0.0, 0.0, 0.0};
+    io::Command last_command;
     int total_armors = 0;  // 总检测到的装甲板数量
     int detected_frames = 0;  // 检测到装甲板的帧数
     
@@ -209,11 +209,11 @@ int main(int argc, char* argv[]) {
 
         plotter.plot(data);
 
-        // cv::resize(img, img, {}, 0.8, 0.8);
+        cv::resize(img, img, {}, 0.8, 0.8);
         // cv::imshow("reprojection", img);
-        // auto key = cv::waitKey(1);
-        // if (key == 'q')
-        //    break;
+        auto key = cv::waitKey(1);
+        if (key == 'q')
+            break;
 
         cboard.send(command);
         frame_count++;
