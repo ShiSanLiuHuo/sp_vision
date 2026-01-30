@@ -1,10 +1,14 @@
-#include <fmt/core.h>
-
+#include <cstddef>
 #include <chrono>
 #include <cmath>
+#include <vector>
+#include <string>
+
+#include <fmt/core.h>
+#include <fmt/format.h> // Explicit formatting support
+
 #include <nlohmann/json.hpp>
 #include <opencv2/opencv.hpp>
-#include <vector>
 
 #include "io/camera.hpp"
 #include "io/cboard.hpp"
@@ -57,7 +61,7 @@ int main(int argc, char* argv[]) {
     auto mode       = io::Mode::idle;
     auto last_mode  = io::Mode::idle;
     int frame_count = 0;
-    io::Command last_command;
+    io::Command last_command = {false, false, 0.0, 0.0, 0.0, 0.0};
     int total_armors = 0;  // 总检测到的装甲板数量
     int detected_frames = 0;  // 检测到装甲板的帧数
     
@@ -69,7 +73,7 @@ int main(int argc, char* argv[]) {
         mode = cboard.mode;
 
         if (last_mode != mode) {
-            tools::logger()->info("Switch to {}", io::MODES[mode]);
+            tools::logger()->info("Switch to {}", io::MODES[mode].c_str());
             last_mode = mode;
         }
 
@@ -91,7 +95,6 @@ int main(int argc, char* argv[]) {
         if (!targets.empty()) {
             auto plan = planner.plan(targets.front(), cboard.bullet_speed);
             if (plan.control) {
-                // 使用 MPC (Planner) 的结果（位置+速度）覆盖 Aimer 的结果
                 command.yaw       = plan.yaw;
                 command.pitch     = plan.pitch;
                 command.yaw_vel   = plan.yaw_vel;
@@ -101,11 +104,10 @@ int main(int argc, char* argv[]) {
 
         auto finish        = std::chrono::steady_clock::now();
 
-        if (!targets.empty() && aimer.debug_aim_point.valid
-            && std::abs(command.yaw - last_command.yaw) * 57.3 < 2)
-        {
-            command.shoot = true;
-        }
+        Eigen::Quaterniond gimbal_q = q;
+        Eigen::Vector3d ypr         = tools::eulers(gimbal_q.toRotationMatrix(), 2, 1, 0);
+
+        command.shoot = shooter.shoot(command, aimer, targets, ypr);
 
         if (command.control) {
             last_command = command;
@@ -119,8 +121,6 @@ int main(int argc, char* argv[]) {
             tools::delta_time(finish, aimer_start) * 1e3
         );
 
-        Eigen::Quaterniond gimbal_q = q;
-        Eigen::Vector3d ypr         = tools::eulers(gimbal_q.toRotationMatrix(), 2, 1, 0);
         auto yaw                    = ypr[0];
 
         tools::draw_text(

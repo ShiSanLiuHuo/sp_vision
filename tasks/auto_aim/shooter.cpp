@@ -22,6 +22,12 @@ bool Shooter::shoot(
 {
   if (!command.control || targets.empty() || !auto_fire_) return false;
 
+  // 条件2：当云台yaw目标角速度>=17rad/s时不允许发弹
+  if (std::abs(command.yaw_vel) >= 17.0) {
+    last_command_ = command;
+    return false;
+  }
+
   auto target_x = targets.front().ekf_x()[0];
   auto target_y = targets.front().ekf_x()[2];
   auto tolerance = std::sqrt(tools::square(target_x) + tools::square(target_y)) > judge_distance_

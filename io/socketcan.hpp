@@ -25,12 +25,7 @@ class SocketCAN
 {
 public:
   SocketCAN(const std::string & interface, std::function<void(const can_frame & frame)> rx_handler)
-  : interface_(interface),
-    socket_fd_(-1),
-    epoll_fd_(-1),
-    rx_handler_(rx_handler),
-    quit_(false),
-    ok_(false)
+    : quit_(false), rx_handler_(std::move(rx_handler))
   {
     try_open();
 
