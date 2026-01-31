@@ -32,13 +32,13 @@ max_side_ratio: 1.5
 max_rectangular_error: 25 # degree
 
 #####-----tracker参数-----#####
-min_detect_count: 5
+min_detect_count: 4
 max_temp_lost_count: 15
 outpost_max_temp_lost_count: 75
 
 #####-----aimer参数-----#####
-yaw_offset: 2   # degree 2
-pitch_offset: 6.5 # degree 2
+yaw_offset: 1.6   # degree 1.5
+pitch_offset: 7.5 # degree 2
 comming_angle: 55 # degree
 leaving_angle: 20 # degree
 decision_speed: 7 # rad/s
@@ -63,6 +63,12 @@ gamma: 0.7
 gain: 20.0   
 vid_pid: "f622:0001"
 
+# camera_name: "mindvision"
+# exposure_ms: 1.2
+# gamma: 0.8
+# gain: 30.0   
+# vid_pid: "f622:0001"
+
 #  1  0  0
 #  0  1  0
 #  0  0  1
@@ -84,7 +90,7 @@ distort_coeffs: [-0.059448299297612375, 0.32250412735017253, 0.00154277647034395
 
 R_camera2gimbal: [-0.027182119030230909, -0.12616154330853446, 0.99163723074269183, -0.99949106557517331, 0.019998323121329122, -0.024853106601381177, -0.016695575474690555, -0.99180811252093692, -0.12664093215554434]
 # t_camera2gimbal: [0.13160669975045827, 0.10377721766577375, 0.024908271912914642]
-t_camera2gimbal: [0.1160669975045827, 0.075721766577375, 0.0808271912914642]
+t_camera2gimbal: [0.1060669975045827, 0.063421766577375, 0.1071912914642]
 
 #####-----cboard参数-----#####
 quaternion_canid: 0x100
@@ -117,4 +123,4 @@ model: "assets/yolo11_buff_int8.xml"
 fire_gap_time: 0.700   # s
 predict_time: 0.120     # s
 
-bullet_speed: 25.0  # m/s
+bullet_speed: 22.0  # m/s

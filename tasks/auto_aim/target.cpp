@@ -14,29 +14,40 @@ Target::Target(
   armor_type(armor.type),
   jumped(false),
   last_id(0),
-  update_count_(0),
   armor_num_(armor_num),
-  t_(t),
+  switch_count_(0),
+  update_count_(0),
   is_switch_(false),
   is_converged_(false),
-  switch_count_(0)
+  height_init_done_(true),
+  t_(t)
 {
   auto r = radius;
   priority = armor.priority;
   const Eigen::VectorXd & xyz = armor.xyz_in_world;
   const Eigen::VectorXd & ypr = armor.ypr_in_world;
 
+  height_offsets_.fill(0.0);
+  if (name == ArmorName::outpost && armor_num_ == 3) {
+    height_init_done_ = false;
+    height_init_start_ = t;
+    for (auto & samples : height_samples_) {
+      samples.clear();
+    }
+  }
+
   // 旋转中心的坐标
   auto center_x = xyz[0] + r * std::cos(ypr[0]);
   auto center_y = xyz[1] + r * std::sin(ypr[0]);
   auto center_z = xyz[2];
+  auto height_step = 0.0;
 
   // x vx y vy z vz a w r l h
   // a: angle
   // w: angular velocity
   // l: r2 - r1
   // h: z2 - z1
-  Eigen::VectorXd x0{{center_x, 0, center_y, 0, center_z, 0, ypr[0], 0, r, 0, 0}};  //初始化预测量
+  Eigen::VectorXd x0{{center_x, 0, center_y, 0, center_z, 0, ypr[0], 0, r, 0, height_step}};  //初始化预测量
   Eigen::MatrixXd P0 = P0_dig.asDiagonal();
 
   // 防止夹角求和出现异常值
@@ -54,6 +65,12 @@ Target::Target(double x, double vyaw, double radius, double h) : armor_num_(4)
   Eigen::VectorXd x0{{x, 0, 0, 0, 0, 0, 0, vyaw, radius, 0, h}};
   Eigen::VectorXd P0_dig{{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}};
   Eigen::MatrixXd P0 = P0_dig.asDiagonal();
+
+  height_offsets_.fill(0.0);
+  height_init_done_ = true;
+  for (auto & samples : height_samples_) {
+    samples.clear();
+  }
 
   // 防止夹角求和出现异常值
   auto x_add = [](const Eigen::VectorXd & a, const Eigen::VectorXd & b) -> Eigen::VectorXd {
@@ -138,7 +155,7 @@ void Target::predict(double dt)
 void Target::update(const Armor & armor)
 {
   // 装甲板匹配
-  int id;
+  int id = 0;
   auto min_angle_error = 1e10;
   const std::vector<Eigen::Vector4d> & xyza_list = armor_xyza_list();
 
@@ -165,6 +182,35 @@ void Target::update(const Armor & armor)
     if (std::abs(angle_error) < std::abs(min_angle_error)) {
       id = xyza_i_list[i].second;
       min_angle_error = angle_error;
+    }
+  }
+
+  if (name == ArmorName::outpost && armor_num_ == 3 && !height_init_done_) {
+    height_samples_[id].push_back(armor.xyz_in_world[2]);
+    auto elapsed = std::chrono::duration<double>(t_ - height_init_start_).count();
+    if (elapsed >= 2.5) {
+      std::array<double, 3> means;
+      for (int i = 0; i < 3; ++i) {
+        if (height_samples_[i].empty()) {
+          means[i] = ekf_.x[4];
+          continue;
+        }
+        double sum = 0.0;
+        for (auto z : height_samples_[i]) sum += z;
+        means[i] = sum / static_cast<double>(height_samples_[i].size());
+      }
+
+      std::array<int, 3> order{0, 1, 2};
+      std::sort(order.begin(), order.end(), [&](int a, int b) { return means[a] < means[b]; });
+
+      height_offsets_.fill(0.0);
+      height_offsets_[order[0]] = -0.1;
+      height_offsets_[order[1]] = 0.0;
+      height_offsets_[order[2]] = 0.1;
+      height_init_done_ = true;
+      tools::logger()->info(
+        "[Target] Outpost height offsets fixed: id0={:.3f}, id1={:.3f}, id2={:.3f}",
+        height_offsets_[0], height_offsets_[1], height_offsets_[2]);
     }
   }
 
@@ -272,7 +318,12 @@ Eigen::Vector3d Target::h_armor_xyz(const Eigen::VectorXd & x, int id) const
   auto r = (use_l_h) ? x[8] + x[9] : x[8];
   auto armor_x = x[0] - r * std::cos(angle);
   auto armor_y = x[2] - r * std::sin(angle);
-  auto armor_z = (use_l_h) ? x[4] + x[10] : x[4];
+  auto armor_z = x[4];
+  if (use_l_h) {
+    armor_z += x[10];
+  } else if (armor_num_ == 3 && name == ArmorName::outpost && height_init_done_) {
+    armor_z += height_offsets_[id];
+  }
 
   return {armor_x, armor_y, armor_z};
 }

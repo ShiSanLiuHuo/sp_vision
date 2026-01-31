@@ -1,4 +1,6 @@
 #include <cstddef>
+#include <array>
+#include <algorithm>
 #include <chrono>
 #include <cmath>
 #include <vector>
@@ -161,10 +163,35 @@ int main(int argc, char* argv[]) {
         if (!targets.empty()) {
             auto target                                  = targets.front();
             std::vector<Eigen::Vector4d> armor_xyza_list = target.armor_xyza_list();
-            for (const Eigen::Vector4d& xyza: armor_xyza_list) {
+            std::array<int, 3> outpost_order{0, 1, 2};
+            if (target.name == auto_aim::ArmorName::outpost && armor_xyza_list.size() == 3) {
+                std::sort(
+                    outpost_order.begin(),
+                    outpost_order.end(),
+                    [&](int a, int b) { return armor_xyza_list[a][2] < armor_xyza_list[b][2]; }
+                );
+            }
+
+            for (std::size_t i = 0; i < armor_xyza_list.size(); ++i) {
+                const auto& xyza = armor_xyza_list[i];
                 auto image_points =
                     solver.reproject_armor(xyza.head(3), xyza[3], target.armor_type, target.name);
                 tools::draw_points(img, image_points, { 0, 255, 0 });
+
+                if (target.name == auto_aim::ArmorName::outpost && armor_xyza_list.size() == 3) {
+                    cv::Point2f center{0.0F, 0.0F};
+                    for (const auto& pt : image_points) {
+                        center.x += pt.x;
+                        center.y += pt.y;
+                    }
+                    center.x /= static_cast<float>(image_points.size());
+                    center.y /= static_cast<float>(image_points.size());
+
+                    std::string tag = "中";
+                    if (static_cast<int>(i) == outpost_order[0]) tag = "下";
+                    if (static_cast<int>(i) == outpost_order[2]) tag = "上";
+                    tools::draw_text(img, tag, center, { 0, 255, 255 });
+                }
             }
             Eigen::VectorXd x = target.ekf_x();
             std::vector<cv::Point3f> center_pt = {{static_cast<float>(x[0]), static_cast<float>(x[2]), static_cast<float>(x[4])}};

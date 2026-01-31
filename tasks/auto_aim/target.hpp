@@ -2,6 +2,7 @@
 #define AUTO_AIM__TARGET_HPP
 
 #include <Eigen/Dense>
+#include <array>
 #include <chrono>
 #include <optional>
 #include <queue>
@@ -51,6 +52,11 @@ private:
   int update_count_;
 
   bool is_switch_, is_converged_;
+
+  bool height_init_done_;
+  std::chrono::steady_clock::time_point height_init_start_;
+  std::array<std::vector<double>, 3> height_samples_;
+  std::array<double, 3> height_offsets_;
 
   tools::ExtendedKalmanFilter ekf_;
   std::chrono::steady_clock::time_point t_;
