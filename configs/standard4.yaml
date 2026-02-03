@@ -36,13 +36,26 @@ min_detect_count: 4
 max_temp_lost_count: 15
 outpost_max_temp_lost_count: 75
 
+#### -----装甲板跳变参数-----##### 注意要大于decision_speed才会补偿pitch角度
+jump_z_threshold: 0.03 # m
+jump_confirm_count: 1
+jump_avg_alpha: 0.8  # 越大当前观测值比重越大，受噪声的影响越大
+jump_fire_cooldown: 0.05 # s 跳变延时发射时间
+jump_pitch_up: 0.3 # degree  装甲板跳变修正量
+jump_pitch_down: 1.5 # degree
+jump_pitch_up_duration: 0.15 # s
+jump_pitch_down_duration: 0.25 # s
+jump_min_interval: 0.1 # s 跳变最小间隔
 #####-----aimer参数-----#####
 yaw_offset: 1.6   # degree 1.5
-pitch_offset: 7.5 # degree 2
-comming_angle: 55 # degree
-leaving_angle: 20 # degree
+pitch_offset: 7.3 # degree 2
+comming_angle: 65 # degree 55
+leaving_angle: 10 # degree 20
+comming_angle_high: 50 # degree 高速(角速度大)使用
+leaving_angle_high: 10 # degree 高速(角速度大)使用
+speed_angle: 7 # rad/s 角速度阈值(用于comming/leaving切换)
 decision_speed: 7 # rad/s
-high_speed_delay_time: 0.0 # s
+high_speed_delay_time: -0.13 # s
 low_speed_delay_time: 0.0 # s planner use this value
 
 #####-----shooter参数-----#####
@@ -50,12 +63,6 @@ first_tolerance: 3 # 近距离射击容差，degree
 second_tolerance: 2 # 远距离射击容差，degree
 judge_distance: 2 #距离判断阈值
 auto_fire: true # 是否由自瞄控制射击
-
-# camera_name: "mindvision"
-# exposure_ms: 1.5
-# gamma: 1.0
-# gain: 5.0   
-# vid_pid: "f622:0001"
 
 camera_name: "mindvision"
 exposure_ms: 1.3
@@ -90,7 +97,7 @@ distort_coeffs: [-0.059448299297612375, 0.32250412735017253, 0.00154277647034395
 
 R_camera2gimbal: [-0.027182119030230909, -0.12616154330853446, 0.99163723074269183, -0.99949106557517331, 0.019998323121329122, -0.024853106601381177, -0.016695575474690555, -0.99180811252093692, -0.12664093215554434]
 # t_camera2gimbal: [0.13160669975045827, 0.10377721766577375, 0.024908271912914642]
-t_camera2gimbal: [0.1060669975045827, 0.063421766577375, 0.1071912914642]
+t_camera2gimbal: [0.1060669975045827, 0.063421766577375, 0.07071912914642]
 
 #####-----cboard参数-----#####
 quaternion_canid: 0x100
@@ -107,7 +114,7 @@ pitch_kd: 0
 
 #####-----planner-----#####
 fire_thresh: 0.0035
-
+# R越大越平滑/Q越大越激进
 max_yaw_acc: 50
 Q_yaw: [8e6, 0]
 R_yaw: [1]

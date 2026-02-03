@@ -24,6 +24,26 @@ Tracker::Tracker(const std::string & config_path, Solver & solver)
   max_temp_lost_count_ = yaml["max_temp_lost_count"].as<int>();
   outpost_max_temp_lost_count_ = yaml["outpost_max_temp_lost_count"].as<int>();
   normal_temp_lost_count_ = max_temp_lost_count_;
+  jump_z_threshold_ = 0.02;
+  jump_confirm_count_ = 2;
+  jump_avg_alpha_ = 1.0;
+  jump_fire_cooldown_ = 0.0;
+  jump_min_interval_ = 0.0;
+  if (yaml["jump_z_threshold"].IsDefined()) {
+    jump_z_threshold_ = yaml["jump_z_threshold"].as<double>();
+  }
+  if (yaml["jump_confirm_count"].IsDefined()) {
+    jump_confirm_count_ = yaml["jump_confirm_count"].as<int>();
+  }
+  if (yaml["jump_avg_alpha"].IsDefined()) {
+    jump_avg_alpha_ = yaml["jump_avg_alpha"].as<double>();
+  }
+  if (yaml["jump_fire_cooldown"].IsDefined()) {
+    jump_fire_cooldown_ = yaml["jump_fire_cooldown"].as<double>();
+  }
+  if (yaml["jump_min_interval"].IsDefined()) {
+    jump_min_interval_ = yaml["jump_min_interval"].as<double>();
+  }
 }
 
 std::string Tracker::state() const { return state_; }
@@ -263,6 +283,11 @@ bool Tracker::set_target(std::list<Armor> & armors, std::chrono::steady_clock::t
     Eigen::VectorXd P0_dig{{1, 64, 1, 64, 1, 64, 0.4, 100, 1, 1, 1}};
     target_ = Target(armor, t, 0.2, 4, P0_dig);
   }
+
+  target_.set_jump_params(jump_z_threshold_, jump_confirm_count_);
+  target_.set_jump_avg_alpha(jump_avg_alpha_);
+  target_.set_jump_fire_cooldown(jump_fire_cooldown_);
+  target_.set_jump_min_interval(jump_min_interval_);
 
   return true;
 }

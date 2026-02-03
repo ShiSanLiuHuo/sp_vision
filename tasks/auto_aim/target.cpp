@@ -20,6 +20,15 @@ Target::Target(
   is_switch_(false),
   is_converged_(false),
   height_init_done_(true),
+  last_jump_dir_(0),
+  has_jump_time_(false),
+  jump_z_threshold_(0.02),
+  jump_confirm_count_(1),
+  jump_pending_dir_(0),
+  jump_pending_count_(0),
+  jump_avg_alpha_(1.0),
+  jump_fire_cooldown_(0.0),
+  jump_min_interval_(0.0),
   t_(t)
 {
   auto r = radius;
@@ -35,6 +44,8 @@ Target::Target(
       samples.clear();
     }
   }
+  jump_avg_z_.fill(0.0);
+  jump_avg_inited_.fill(false);
 
   // 旋转中心的坐标
   auto center_x = xyz[0] + r * std::cos(ypr[0]);
@@ -68,6 +79,17 @@ Target::Target(double x, double vyaw, double radius, double h) : armor_num_(4)
 
   height_offsets_.fill(0.0);
   height_init_done_ = true;
+  last_jump_dir_ = 0;
+  has_jump_time_ = false;
+  jump_z_threshold_ = 0.02;
+  jump_confirm_count_ = 1;
+  jump_pending_dir_ = 0;
+  jump_pending_count_ = 0;
+  jump_avg_alpha_ = 1.0;
+  jump_avg_z_.fill(0.0);
+  jump_avg_inited_.fill(false);
+  jump_fire_cooldown_ = 0.0;
+  jump_min_interval_ = 0.0;
   for (auto & samples : height_samples_) {
     samples.clear();
   }
@@ -211,6 +233,70 @@ void Target::update(const Armor & armor)
       tools::logger()->info(
         "[Target] Outpost height offsets fixed: id0={:.3f}, id1={:.3f}, id2={:.3f}",
         height_offsets_[0], height_offsets_[1], height_offsets_[2]);
+    }
+  }
+
+  if (static_cast<int>(xyza_list.size()) > id) {
+    auto current_z = xyza_list[id][2];
+    if (!jump_avg_inited_[id]) {
+      jump_avg_z_[id] = current_z;
+      jump_avg_inited_[id] = true;
+    } else {
+      jump_avg_z_[id] = jump_avg_alpha_ * current_z + (1.0 - jump_avg_alpha_) * jump_avg_z_[id];
+    }
+  }
+
+  if (id != last_id) {
+    int candidate_dir = 0;
+    double delta_z = 0.0;
+    if (name == ArmorName::outpost && armor_num_ == 3 && height_init_done_) {
+      auto prev_offset = height_offsets_[last_id];
+      auto new_offset = height_offsets_[id];
+      delta_z = new_offset - prev_offset;
+    } else if (
+      static_cast<int>(xyza_list.size()) > std::max(id, last_id) &&
+      jump_avg_inited_[id] && jump_avg_inited_[last_id]) {
+      auto prev_z = jump_avg_z_[last_id];
+      auto new_z = jump_avg_z_[id];
+      delta_z = new_z - prev_z;
+    }
+
+    if (std::abs(delta_z) >= jump_z_threshold_) {
+      candidate_dir = (delta_z > 0) ? 1 : -1;
+    } else {
+      tools::logger()->info(
+        "[Target] Jump detected: roughly same height (dz={:.3f})", delta_z);
+    }
+
+    if (candidate_dir != 0) {
+      if (candidate_dir == jump_pending_dir_) {
+        jump_pending_count_++;
+      } else {
+        jump_pending_dir_ = candidate_dir;
+        jump_pending_count_ = 1;
+      }
+
+      if (jump_pending_count_ >= jump_confirm_count_) {
+        auto can_confirm = true;
+        if (has_jump_time_ && jump_min_interval_ > 0.0) {
+          auto since_last = std::chrono::duration<double>(t_ - last_jump_time_).count();
+          if (since_last >= 0.0 && since_last < jump_min_interval_) {
+            can_confirm = false;
+          }
+        }
+        if (can_confirm) {
+          last_jump_dir_ = candidate_dir;
+          last_jump_time_ = t_;
+          has_jump_time_ = true;
+          if (candidate_dir < 0) {
+            tools::logger()->info("[Target] Jump confirmed: high -> low (dz={:.3f})", delta_z);
+          } else {
+            tools::logger()->info("[Target] Jump confirmed: low -> high (dz={:.3f})", delta_z);
+          }
+        }
+        jump_pending_count_ = 0;
+        jump_pending_dir_ = 0;
+      }
     }
   }
 
@@ -369,5 +455,41 @@ Eigen::MatrixXd Target::h_jacobian(const Eigen::VectorXd & x, int id) const
 }
 
 bool Target::checkinit() { return isinit; }
+
+bool Target::outpost_height_ready() const { return height_init_done_; }
+
+int Target::last_jump_dir() const { return last_jump_dir_; }
+
+bool Target::has_jump_time() const { return has_jump_time_; }
+
+std::chrono::steady_clock::time_point Target::last_jump_time() const { return last_jump_time_; }
+
+void Target::set_jump_params(double z_threshold, int confirm_count)
+{
+  jump_z_threshold_ = z_threshold;
+  jump_confirm_count_ = std::max(1, confirm_count);
+}
+
+void Target::set_jump_avg_alpha(double alpha)
+{
+  jump_avg_alpha_ = std::clamp(alpha, 0.0, 1.0);
+}
+
+void Target::set_jump_fire_cooldown(double seconds)
+{
+  jump_fire_cooldown_ = std::max(0.0, seconds);
+}
+
+void Target::set_jump_min_interval(double seconds)
+{
+  jump_min_interval_ = std::max(0.0, seconds);
+}
+
+bool Target::in_jump_fire_cooldown(std::chrono::steady_clock::time_point t) const
+{
+  if (!has_jump_time_ || jump_fire_cooldown_ <= 0.0) return false;
+  auto age = std::chrono::duration<double>(t - last_jump_time_).count();
+  return age >= 0.0 && age <= jump_fire_cooldown_;
+}
 
 }  // namespace auto_aim

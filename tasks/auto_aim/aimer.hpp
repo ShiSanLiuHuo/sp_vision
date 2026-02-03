@@ -37,10 +37,17 @@ private:
   double pitch_offset_;
   double comming_angle_;
   double leaving_angle_;
+  double comming_angle_high_;
+  double leaving_angle_high_;
+  double speed_angle_;
   double lock_id_ = -1;
   double high_speed_delay_time_;
   double low_speed_delay_time_;
   double decision_speed_;
+  double jump_pitch_up_;
+  double jump_pitch_down_;
+  double jump_pitch_up_duration_;
+  double jump_pitch_down_duration_;
 
   AimPoint choose_aim_point(const Target & target);
 };

@@ -22,6 +22,11 @@ bool Shooter::shoot(
 {
   if (!command.control || targets.empty() || !auto_fire_) return false;
 
+  if (targets.front().in_jump_fire_cooldown(std::chrono::steady_clock::now())) {
+    last_command_ = command;
+    return false;
+  }
+
   // 条件2：当云台yaw目标角速度>=17rad/s时不允许发弹
   if (std::abs(command.yaw_vel) >= 17.0) {
     last_command_ = command;

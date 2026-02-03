@@ -178,19 +178,20 @@ int main(int argc, char* argv[]) {
                     solver.reproject_armor(xyza.head(3), xyza[3], target.armor_type, target.name);
                 tools::draw_points(img, image_points, { 0, 255, 0 });
 
-                if (target.name == auto_aim::ArmorName::outpost && armor_xyza_list.size() == 3) {
-                    cv::Point2f center{0.0F, 0.0F};
-                    for (const auto& pt : image_points) {
-                        center.x += pt.x;
-                        center.y += pt.y;
-                    }
-                    center.x /= static_cast<float>(image_points.size());
-                    center.y /= static_cast<float>(image_points.size());
+                cv::Point2f center{0.0F, 0.0F};
+                for (const auto& pt : image_points) {
+                    center.x += pt.x;
+                    center.y += pt.y;
+                }
+                center.x /= static_cast<float>(image_points.size());
+                center.y /= static_cast<float>(image_points.size());
+                tools::draw_text(img, fmt::format("id:{}", i), center, { 255, 255, 0 });
 
+                if (target.name == auto_aim::ArmorName::outpost && armor_xyza_list.size() == 3) {
                     std::string tag = "中";
                     if (static_cast<int>(i) == outpost_order[0]) tag = "下";
                     if (static_cast<int>(i) == outpost_order[2]) tag = "上";
-                    tools::draw_text(img, tag, center, { 0, 255, 255 });
+                    tools::draw_text(img, tag, {center.x, center.y + 18.0F}, { 0, 255, 255 });
                 }
             }
             Eigen::VectorXd x = target.ekf_x();

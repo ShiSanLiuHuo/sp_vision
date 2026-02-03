@@ -42,6 +42,16 @@ public:
 
   bool convergened();
 
+  bool outpost_height_ready() const;
+  int last_jump_dir() const;
+  bool has_jump_time() const;
+  std::chrono::steady_clock::time_point last_jump_time() const;
+  void set_jump_params(double z_threshold, int confirm_count);
+  void set_jump_avg_alpha(double alpha);
+  void set_jump_fire_cooldown(double seconds);
+  void set_jump_min_interval(double seconds);
+  bool in_jump_fire_cooldown(std::chrono::steady_clock::time_point t) const;
+
   bool isinit = false;
 
   bool checkinit();
@@ -57,6 +67,18 @@ private:
   std::chrono::steady_clock::time_point height_init_start_;
   std::array<std::vector<double>, 3> height_samples_;
   std::array<double, 3> height_offsets_;
+  int last_jump_dir_;
+  bool has_jump_time_;
+  std::chrono::steady_clock::time_point last_jump_time_;
+  double jump_z_threshold_;
+  int jump_confirm_count_;
+  int jump_pending_dir_;
+  int jump_pending_count_;
+  double jump_avg_alpha_;
+  std::array<double, 4> jump_avg_z_;
+  std::array<bool, 4> jump_avg_inited_;
+  double jump_fire_cooldown_;
+  double jump_min_interval_;
 
   tools::ExtendedKalmanFilter ekf_;
   std::chrono::steady_clock::time_point t_;

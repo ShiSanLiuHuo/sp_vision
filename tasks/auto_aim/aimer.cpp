@@ -19,9 +19,37 @@ Aimer::Aimer(const std::string & config_path)
   pitch_offset_ = yaml["pitch_offset"].as<double>() / 57.3;    // degree to rad
   comming_angle_ = yaml["comming_angle"].as<double>() / 57.3;  // degree to rad
   leaving_angle_ = yaml["leaving_angle"].as<double>() / 57.3;  // degree to rad
+    comming_angle_high_ = comming_angle_;
+    leaving_angle_high_ = leaving_angle_;
   high_speed_delay_time_ = yaml["high_speed_delay_time"].as<double>();
   low_speed_delay_time_ = yaml["low_speed_delay_time"].as<double>();
   decision_speed_ = yaml["decision_speed"].as<double>();
+    speed_angle_ = decision_speed_;
+    if (yaml["comming_angle_high"].IsDefined()) {
+      comming_angle_high_ = yaml["comming_angle_high"].as<double>() / 57.3;
+    }
+    if (yaml["leaving_angle_high"].IsDefined()) {
+      leaving_angle_high_ = yaml["leaving_angle_high"].as<double>() / 57.3;
+    }
+    if (yaml["speed_angle"].IsDefined()) {
+      speed_angle_ = yaml["speed_angle"].as<double>();
+    }
+  jump_pitch_up_ = 0.0;
+  jump_pitch_down_ = 0.0;
+  jump_pitch_up_duration_ = 0.0;
+  jump_pitch_down_duration_ = 0.0;
+  if (yaml["jump_pitch_up"].IsDefined()) {
+    jump_pitch_up_ = yaml["jump_pitch_up"].as<double>() / 57.3;
+  }
+  if (yaml["jump_pitch_down"].IsDefined()) {
+    jump_pitch_down_ = yaml["jump_pitch_down"].as<double>() / 57.3;
+  }
+  if (yaml["jump_pitch_up_duration"].IsDefined()) {
+    jump_pitch_up_duration_ = yaml["jump_pitch_up_duration"].as<double>();
+  }
+  if (yaml["jump_pitch_down_duration"].IsDefined()) {
+    jump_pitch_down_duration_ = yaml["jump_pitch_down_duration"].as<double>();
+  }
   if (yaml["left_yaw_offset"].IsDefined() && yaml["right_yaw_offset"].IsDefined()) {
     left_yaw_offset_ = yaml["left_yaw_offset"].as<double>() / 57.3;    // degree to rad
     right_yaw_offset_ = yaml["right_yaw_offset"].as<double>() / 57.3;  // degree to rad
@@ -38,9 +66,13 @@ io::Command Aimer::aim(
 
   auto ekf = target.ekf();
   double delay_time =
-    target.ekf_x()[7] > decision_speed_ ? high_speed_delay_time_ : low_speed_delay_time_;
+    std::abs(target.ekf_x()[7]) > decision_speed_ ? high_speed_delay_time_ : low_speed_delay_time_;
 
-  if (bullet_speed < 14) bullet_speed = 23;
+  // tools::logger()->info(
+  //   "[Aimer] w={:.3f} rad/s, delay={:.3f}s, bullet_speed={:.2f} m/s (threshold={:.3f})",
+  //   target.ekf_x()[7], delay_time, bullet_speed, decision_speed_);
+
+  if (bullet_speed <= 20) bullet_speed = 20;
 
   // 考虑detecor和tracker所消耗的时间，此外假设aimer的用时可忽略不计
   auto future = timestamp;
@@ -118,7 +150,19 @@ io::Command Aimer::aim(
   // 计算最终角度
   Eigen::Vector3d final_xyz = debug_aim_point.xyza.head(3);
   double yaw = std::atan2(final_xyz.y(), final_xyz.x()) + yaw_offset_;
-  double pitch = -(current_traj.pitch + pitch_offset_);  //世界坐标系下pitch向上为负
+  double jump_correction = 0.0;
+  if (target.has_jump_time() && std::abs(target.ekf_x()[7]) >= decision_speed_) {
+    auto age = std::chrono::duration<double>(timestamp - target.last_jump_time()).count();
+    auto dir = target.last_jump_dir();
+    if (dir < 0 && jump_pitch_up_duration_ > 0.0 && age >= 0.0 && age <= jump_pitch_up_duration_) {
+      jump_correction = jump_pitch_up_;
+    }
+    if (dir > 0 && jump_pitch_down_duration_ > 0.0 && age >= 0.0 && age <= jump_pitch_down_duration_) {
+      jump_correction = -jump_pitch_down_;
+    }
+  }
+
+  double pitch = -(current_traj.pitch + pitch_offset_ + jump_correction);
   return {true, false, yaw, pitch, 0, 0, 0, 0};
 }
 
@@ -194,8 +238,13 @@ AimPoint Aimer::choose_aim_point(const Target & target)
     coming_angle = 70 / 57.3;
     leaving_angle = 30 / 57.3;
   } else {
-    coming_angle = comming_angle_;
-    leaving_angle = leaving_angle_;
+    if (std::abs(ekf_x[7]) >= speed_angle_) {
+      coming_angle = comming_angle_high_;
+      leaving_angle = leaving_angle_high_;
+    } else {
+      coming_angle = comming_angle_;
+      leaving_angle = leaving_angle_;
+    }
   }
 
   // 在小陀螺时，一侧的装甲板不断出现，另一侧的装甲板不断消失，显然前者被打中的概率更高

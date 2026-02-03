@@ -35,6 +35,11 @@ max_rectangular_error: 25 # degree
 min_detect_count: 5
 max_temp_lost_count: 15
 outpost_max_temp_lost_count: 75
+jump_z_threshold: 0.02 # m
+jump_confirm_count: 2
+jump_avg_alpha: 0.5
+jump_fire_cooldown: 0.0 # s
+jump_min_interval: 0.0 # s
 
 #####-----aimer参数-----#####
 yaw_offset: 2 # degree -2.5
@@ -44,6 +49,10 @@ leaving_angle: 20 # degree
 decision_speed: 7 # rad/s
 high_speed_delay_time: 0.0 # s
 low_speed_delay_time: 0.0 # s planner use this value
+jump_pitch_up: 0.0 # degree
+jump_pitch_down: 0.0 # degree
+jump_pitch_up_duration: 0.0 # s
+jump_pitch_down_duration: 0.0 # s
 
 #####-----shooter参数-----#####
 first_tolerance: 3 # 近距离射击容差，degree

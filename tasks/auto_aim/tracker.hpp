@@ -38,6 +38,11 @@ private:
   int temp_lost_count_;
   int outpost_max_temp_lost_count_;
   int normal_temp_lost_count_;
+  double jump_z_threshold_;
+  int jump_confirm_count_;
+  double jump_avg_alpha_;
+  double jump_fire_cooldown_;
+  double jump_min_interval_;
   std::string state_, pre_state_;
   Target target_;
   std::chrono::steady_clock::time_point last_timestamp_;

@@ -64,6 +64,11 @@ can_interface: "can0"
 min_detect_count: 5
 max_temp_lost_count: 15
 outpost_max_temp_lost_count: 150
+jump_z_threshold: 0.02 # m
+jump_confirm_count: 2
+jump_avg_alpha: 0.5
+jump_fire_cooldown: 0.0 # s
+jump_min_interval: 0.0 # s
 
 #####-----aimer参数-----#####
 yaw_offset: 0 # degree -2.5
@@ -74,6 +79,10 @@ min_spin_speed: 2 # rad/s
 decision_speed: 12 # rad/s
 high_speed_delay_time: 0.005 # s
 low_speed_delay_time: 0.005 # s
+jump_pitch_up: 0.0 # degree
+jump_pitch_down: 0.0 # degree
+jump_pitch_up_duration: 0.0 # s
+jump_pitch_down_duration: 0.0 # s
 
 #####-----decider参数-----#####
 mode: 1
