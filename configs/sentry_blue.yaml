@@ -1,8 +1,8 @@
-enemy_color: "red"
-# enemy_color: "blue"
+# enemy_color: "red"
+enemy_color: "blue"
 
 #####-----神经网络参数-----#####
-yolo_name: yolov5
+yolo_name: yolo11
 classify_model: assets/tiny_resnet.onnx
 yolo11_model_path: assets/yolo11.xml
 yolov8_model_path: assets/yolov8.xml
@@ -13,14 +13,14 @@ use_traditional: true
 
 #####-----ROI-----#####
 roi: 
-  x: 420
-  y: 50
-  width: 600
-  height: 600
+  x: 240
+  y: 420
+  width: 800
+  height: 560
 
-use_roi: false
+use_roi: true
 
-#####-----传统方法参数-----#####
+#####-----传统方法参数-----#####  需要修改，根据相机安装的位置
 threshold: 150
 max_angle_error: 45 # degree
 min_lightbar_ratio: 1.5
@@ -32,27 +32,41 @@ max_side_ratio: 1.5
 max_rectangular_error: 25 # degree
 
 #####-----tracker参数-----#####
-min_detect_count: 5
-max_temp_lost_count: 15
+min_detect_count: 6
+max_temp_lost_count: 30
+outpost_comming_angle: 70 # degree 前哨站进入视野角度
+outpost_leaving_angle: 30 # degree 前哨站离开视野角度
 outpost_max_temp_lost_count: 75
-jump_z_threshold: 0.02 # m
-jump_confirm_count: 2
-jump_avg_alpha: 0.5
-jump_fire_cooldown: 0.0 # s
-jump_min_interval: 0.0 # s
 
+#### -----装甲板跳变参数-----##### 注意要大于decision_speed才会补偿pitch角度
+jump_z_threshold: 0.02 # m
+jump_confirm_count: 1
+jump_avg_alpha: 0.8  # 越大当前观测值比重越大，受噪声的影响越大
+jump_fire_cooldown: 0.05 # s 固定延时(不使用动态参数时生效)
+jump_fire_cooldown_min: 0.05 # s 低速跳变发弹延时
+jump_fire_cooldown_max: 0.20 # s 高速跳变发弹延时
+outpost_jump_fire_cooldown: 0.08 # s 前哨站固定跳变发弹延时(不使用动态参数时生效)
+jump_fire_cooldown_speed_start: 3.0 # rad/s 低速起点
+jump_fire_cooldown_speed_end: 10.0 # rad/s 高速终点
+jump_pitch_up: 0.3 # degree  装甲板跳变修正量
+jump_pitch_down: 1.5 # degree
+jump_pitch_up_duration: 0.15 # s
+jump_pitch_down_duration: 0.25 # s
+jump_min_interval: 0.15 # s 跳变最小间隔
 #####-----aimer参数-----#####
-yaw_offset: 2   # degree 2
-pitch_offset: 6.5 # degree 2
-comming_angle: 55 # degree
-leaving_angle: 20 # degree
+yaw_offset: 1.6   # degree 1.5
+pitch_offset: 7.3 # degree 2
+comming_angle: 65 # degree 55
+leaving_angle: 10 # degree 20
+comming_angle_high: 50 # degree 高速(角速度大)使用
+leaving_angle_high: 10 # degree 高速(角速度大)使用
+comming_end_angle: 55 # degree 极高速下的最小角度
+leaving_end_angle: 8 # degree 极高速下的最小角度
+speed_angle: 7 # rad/s 角速度阈值(用于comming/leaving切换)
+speed_angle_max: 12 # rad/s 达到该角速度时角度缩减到end_angle
 decision_speed: 7 # rad/s
-high_speed_delay_time: 0.0 # s
-low_speed_delay_time: 0.0 # s planner use this value
-jump_pitch_up: 0.0 # degree
-jump_pitch_down: 0.0 # degree
-jump_pitch_up_duration: 0.0 # s
-jump_pitch_down_duration: 0.0 # s
+high_speed_delay_time: -0.13 # s
+low_speed_delay_time: -0.11 # s planner use this value
 
 #####-----shooter参数-----#####
 first_tolerance: 3 # 近距离射击容差，degree
@@ -60,17 +74,17 @@ second_tolerance: 2 # 远距离射击容差，degree
 judge_distance: 2 #距离判断阈值
 auto_fire: true # 是否由自瞄控制射击
 
-# camera_name: "mindvision"
-# exposure_ms: 1.5
-# gamma: 1.0
-# gain: 5.0   
-# vid_pid: "f622:0001"
+camera_name: mindvision
+exposure_ms: 2.8
+gamma: 0.9
+gain: 0
+vid_pid: f622:d132
 
-camera_name: "mindvision"
-exposure_ms: 1.7
-gamma: 0.6
-gain: 15.0   
-vid_pid: "f622:0001"
+# camera_name: "mindvision"
+# exposure_ms: 1.2
+# gamma: 0.8
+# gain: 30.0   
+# vid_pid: "f622:0001"
 
 #  1  0  0
 #  0  1  0
@@ -93,7 +107,8 @@ distort_coeffs: [-0.059448299297612375, 0.32250412735017253, 0.00154277647034395
 
 R_camera2gimbal: [-0.027182119030230909, -0.12616154330853446, 0.99163723074269183, -0.99949106557517331, 0.019998323121329122, -0.024853106601381177, -0.016695575474690555, -0.99180811252093692, -0.12664093215554434]
 # t_camera2gimbal: [0.13160669975045827, 0.10377721766577375, 0.024908271912914642]
-t_camera2gimbal: [0.1160669975045827, 0.075721766577375, 0.0808271912914642]
+# t_camera2gimbal: [0.1060669975045827, 0.063421766577375, 0.07071912914642]
+t_camera2gimbal: [0.08060669975045827, 0.003421766577375, 0.071912914642]
 
 #####-----cboard参数-----#####
 quaternion_canid: 0x100
@@ -110,7 +125,7 @@ pitch_kd: 0
 
 #####-----planner-----#####
 fire_thresh: 0.0035
-
+# R越大越平滑/Q越大越激进
 max_yaw_acc: 50
 Q_yaw: [8e6, 0]
 R_yaw: [1]
@@ -138,4 +153,4 @@ model: "assets/yolo11_buff_int8.xml"
 fire_gap_time: 0.700   # s
 predict_time: 0.120     # s
 
-bullet_speed: 25.0  # m/s
+bullet_speed: 22.0  # m/s

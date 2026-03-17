@@ -28,6 +28,10 @@ Target::Target(
   jump_pending_count_(0),
   jump_avg_alpha_(1.0),
   jump_fire_cooldown_(0.0),
+  jump_fire_cooldown_min_(0.0),
+  jump_fire_cooldown_max_(0.0),
+  jump_fire_cooldown_speed_start_(0.0),
+  jump_fire_cooldown_speed_end_(0.0),
   jump_min_interval_(0.0),
   t_(t)
 {
@@ -89,6 +93,10 @@ Target::Target(double x, double vyaw, double radius, double h) : armor_num_(4)
   jump_avg_z_.fill(0.0);
   jump_avg_inited_.fill(false);
   jump_fire_cooldown_ = 0.0;
+  jump_fire_cooldown_min_ = 0.0;
+  jump_fire_cooldown_max_ = 0.0;
+  jump_fire_cooldown_speed_start_ = 0.0;
+  jump_fire_cooldown_speed_end_ = 0.0;
   jump_min_interval_ = 0.0;
   for (auto & samples : height_samples_) {
     samples.clear();
@@ -478,6 +486,32 @@ void Target::set_jump_avg_alpha(double alpha)
 void Target::set_jump_fire_cooldown(double seconds)
 {
   jump_fire_cooldown_ = std::max(0.0, seconds);
+}
+
+void Target::set_jump_fire_cooldown_params(
+  double min_seconds, double max_seconds, double speed_start, double speed_end)
+{
+  jump_fire_cooldown_min_ = std::max(0.0, min_seconds);
+  jump_fire_cooldown_max_ = std::max(0.0, max_seconds);
+  jump_fire_cooldown_speed_start_ = speed_start;
+  jump_fire_cooldown_speed_end_ = speed_end;
+
+  if (jump_fire_cooldown_max_ < jump_fire_cooldown_min_) {
+    std::swap(jump_fire_cooldown_min_, jump_fire_cooldown_max_);
+  }
+
+  const double abs_w = std::abs(ekf_.x[7]);
+  if (jump_fire_cooldown_speed_end_ <= jump_fire_cooldown_speed_start_) {
+    jump_fire_cooldown_ = jump_fire_cooldown_min_;
+    return;
+  }
+
+  const double ratio = std::clamp(
+    (abs_w - jump_fire_cooldown_speed_start_) /
+      (jump_fire_cooldown_speed_end_ - jump_fire_cooldown_speed_start_),
+    0.0, 1.0);
+  jump_fire_cooldown_ = jump_fire_cooldown_min_ +
+                        ratio * (jump_fire_cooldown_max_ - jump_fire_cooldown_min_);
 }
 
 void Target::set_jump_min_interval(double seconds)

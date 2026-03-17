@@ -41,6 +41,9 @@ int main(int argc, char * argv[])
 
   video.set(cv::CAP_PROP_POS_FRAMES, start_index);
 
+  int total_frames = 0;
+  int detect_frames = 0;
+
   for (int frame_count = start_index; !exiter.exit(); frame_count++) {
     if (end_index > 0 && frame_count > end_index) break;
 
@@ -54,6 +57,13 @@ int main(int argc, char * argv[])
       armors = detector.detect(img, frame_count);
     else
       armors = yolo.detect(img, frame_count);
+
+    total_frames++;
+    if (!armors.empty()) detect_frames++;
+
+    double detect_rate = total_frames > 0 ? 100.0 * detect_frames / total_frames : 0.0;
+    fmt::print("frame {:4d}  detect_rate={:.1f}%  ({}/{} frames)\n",
+      frame_count, detect_rate, detect_frames, total_frames);
 
     if (!armors.empty()) {
       nlohmann::json data;
@@ -73,6 +83,10 @@ int main(int argc, char * argv[])
     auto key = cv::waitKey(33);
     if (key == 'q') break;
   }
+
+  double final_rate = total_frames > 0 ? 100.0 * detect_frames / total_frames : 0.0;
+  fmt::print("=== 识别结束: 总识别率 {:.2f}%  ({}/{} 帧) ===\n",
+    final_rate, detect_frames, total_frames);
 
   return 0;
 }

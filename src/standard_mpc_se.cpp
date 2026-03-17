@@ -11,6 +11,7 @@
 
 #include <nlohmann/json.hpp>
 #include <opencv2/opencv.hpp>
+#include <yaml-cpp/yaml.h>
 
 #include "io/camera.hpp"
 #include "io/cboard.hpp"
@@ -42,6 +43,44 @@ int main(int argc, char* argv[]) {
         return 0;
     }
 
+    double jump_pitch_up_duration = 0.0;
+    double jump_pitch_down_duration = 0.0;
+    double decision_speed = 0.0;
+    bool use_identity_pose = false;
+    double target_jump_angle_threshold_deg = 5.0;   // 判定为"大跳变"的阈值（度）
+    double target_stabilize_alpha = 0.3;             // 平滑系数，越小越平滑（推荐0.1~0.5）
+    bool enable_target_stabilize = true;             // 是否启用平滑过渡
+    try {
+        auto yaml = YAML::LoadFile(config_path);
+        if (yaml["jump_pitch_up_duration"].IsDefined()) {
+            jump_pitch_up_duration = yaml["jump_pitch_up_duration"].as<double>();
+        }
+        if (yaml["jump_pitch_down_duration"].IsDefined()) {
+            jump_pitch_down_duration = yaml["jump_pitch_down_duration"].as<double>();
+        }
+        if (yaml["decision_speed"].IsDefined()) {
+            decision_speed = yaml["decision_speed"].as<double>();
+        }
+        if (yaml["use_identity_pose"].IsDefined()) {
+            use_identity_pose = yaml["use_identity_pose"].as<bool>();
+        }
+        if (yaml["target_jump_angle_threshold_deg"].IsDefined()) {
+            target_jump_angle_threshold_deg = yaml["target_jump_angle_threshold_deg"].as<double>();
+        }
+        if (yaml["target_stabilize_alpha"].IsDefined()) {
+            target_stabilize_alpha = yaml["target_stabilize_alpha"].as<double>();
+        }
+        if (yaml["enable_target_stabilize"].IsDefined()) {
+            enable_target_stabilize = yaml["enable_target_stabilize"].as<bool>();
+        }
+    } catch (const YAML::Exception & e) {
+        tools::logger()->warn("Failed to read configuration: {}", e.what());
+    }
+
+    if (use_identity_pose) {
+        tools::logger()->warn("[Debug] use_identity_pose=true, IMU quaternion from CBoard is ignored.");
+    }
+
     tools::Exiter exiter;
     tools::Plotter plotter;
     tools::Recorder recorder;
@@ -71,7 +110,7 @@ int main(int argc, char* argv[]) {
 
     while (!exiter.exit()) {
         camera.read(img, t);
-        q    = cboard.imu_at(t - 1ms);
+        q    = use_identity_pose ? Eigen::Quaterniond::Identity() : cboard.imu_at(t - 1ms);
         mode = cboard.mode;
 
         if (last_mode != mode) {
@@ -115,13 +154,13 @@ int main(int argc, char* argv[]) {
             last_command = command;
         }
 
-        tools::logger()->info(
-            "[{}] yolo: {:.1f}ms, tracker: {:.1f}ms, aimer: {:.1f}ms",
-            frame_count,
-            tools::delta_time(tracker_start, yolo_start) * 1e3,
-            tools::delta_time(aimer_start, tracker_start) * 1e3,
-            tools::delta_time(finish, aimer_start) * 1e3
-        );
+        // tools::logger()->info(
+        //     "[{}] yolo: {:.1f}ms, tracker: {:.1f}ms, aimer: {:.1f}ms",
+        //     frame_count,
+        //     tools::delta_time(tracker_start, yolo_start) * 1e3,
+        //     tools::delta_time(aimer_start, tracker_start) * 1e3,
+        //     tools::delta_time(finish, aimer_start) * 1e3
+        // );
 
         auto yaw                    = ypr[0];
 
@@ -172,6 +211,22 @@ int main(int argc, char* argv[]) {
                 );
             }
 
+            bool show_jump_up = false;
+            bool show_jump_down = false;
+            if (target.has_jump_time()) {
+                const double abs_w = std::abs(target.ekf_x()[7]);
+                if (abs_w >= decision_speed) {
+                    auto age = std::chrono::duration<double>(t - target.last_jump_time()).count();
+                    auto dir = target.last_jump_dir();
+                    if (dir < 0 && jump_pitch_up_duration > 0.0 && age >= 0.0 && age <= jump_pitch_up_duration) {
+                        show_jump_up = true;
+                    }
+                    if (dir > 0 && jump_pitch_down_duration > 0.0 && age >= 0.0 && age <= jump_pitch_down_duration) {
+                        show_jump_down = true;
+                    }
+                }
+            }
+
             for (std::size_t i = 0; i < armor_xyza_list.size(); ++i) {
                 const auto& xyza = armor_xyza_list[i];
                 auto image_points =
@@ -188,9 +243,9 @@ int main(int argc, char* argv[]) {
                 tools::draw_text(img, fmt::format("id:{}", i), center, { 255, 255, 0 });
 
                 if (target.name == auto_aim::ArmorName::outpost && armor_xyza_list.size() == 3) {
-                    std::string tag = "中";
-                    if (static_cast<int>(i) == outpost_order[0]) tag = "下";
-                    if (static_cast<int>(i) == outpost_order[2]) tag = "上";
+                    std::string tag = "middle";
+                    if (static_cast<int>(i) == outpost_order[0]) tag = "low";
+                    if (static_cast<int>(i) == outpost_order[2]) tag = "high";
                     tools::draw_text(img, tag, {center.x, center.y + 18.0F}, { 0, 255, 255 });
                 }
             }
@@ -207,6 +262,20 @@ int main(int argc, char* argv[]) {
                     .reproject_armor(aim_xyza.head(3), aim_xyza[3], target.armor_type, target.name);
             if (aim_point.valid) {
                 tools::draw_points(img, image_points, { 0, 0, 255 });
+
+                cv::Point2f aim_center{0.0F, 0.0F};
+                for (const auto& pt : image_points) {
+                    aim_center.x += pt.x;
+                    aim_center.y += pt.y;
+                }
+                aim_center.x /= static_cast<float>(image_points.size());
+                aim_center.y /= static_cast<float>(image_points.size());
+                if (show_jump_up) {
+                    tools::draw_text(img, "Up", {aim_center.x, aim_center.y - 14.0F}, { 0, 165, 255 });
+                }
+                if (show_jump_down) {
+                    tools::draw_text(img, "Down", {aim_center.x, aim_center.y - 14.0F}, { 0, 0, 255 });
+                }
             }
 
             data["x"]         = x[0];
@@ -237,11 +306,23 @@ int main(int argc, char* argv[]) {
 
         plotter.plot(data);
 
-        cv::resize(img, img, {}, 0.8, 0.8);
-        // cv::imshow("reprojection", img);
+        cv::resize(img, img, {}, 0.9, 0.9);
+        cv::imshow("reprojection", img);
         auto key = cv::waitKey(1);
         if (key == 'q')
             break;
+
+        // 平滑过渡逻辑：当目标位置跳变过大时，逐帧过渡而不是直接跳变
+        if (enable_target_stabilize && command.control) {
+            double delta_yaw = std::abs(command.yaw - last_command.yaw) * 57.3;   // 转为度
+            double delta_pitch = std::abs(command.pitch - last_command.pitch) * 57.3;
+            
+            // 如果yaw或pitch跳变超过阈值，应用指数平滑
+            if (delta_yaw > target_jump_angle_threshold_deg || delta_pitch > target_jump_angle_threshold_deg) {
+                command.yaw = (1.0 - target_stabilize_alpha) * last_command.yaw + target_stabilize_alpha * command.yaw;
+                command.pitch = (1.0 - target_stabilize_alpha) * last_command.pitch + target_stabilize_alpha * command.pitch;
+            }
+        }
 
         cboard.send(command);
         frame_count++;

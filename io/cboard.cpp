@@ -13,12 +13,38 @@ CBoard::CBoard(const std::string& config_path):
     queue_(5000) {
     auto yaml          = YAML::LoadFile(config_path);
 
+    if (yaml["bullet_speed"]) {
+        default_bullet_speed_ = yaml["bullet_speed"].as<double>();
+        bullet_speed = default_bullet_speed_;
+    }
+
+    if (yaml["use_default_bullet_speed"]) {
+        use_default_bullet_speed_ = yaml["use_default_bullet_speed"].as<bool>();
+    }
+
 
     if (yaml["phoenix_angle_unit"]) {
         auto unit = yaml["phoenix_angle_unit"].as<std::string>();
         for (auto& c: unit) c = static_cast<char>(std::tolower(c));
         phoenix_angles_in_degrees_ = (unit == "deg" || unit == "degree" || unit == "degrees");
     }
+
+    if (yaml["imu_yaw_offset_deg"]) {
+        imu_yaw_offset_rad_ = yaml["imu_yaw_offset_deg"].as<double>() * M_PI / 180.0;
+    }
+    if (yaml["imu_pitch_offset_deg"]) {
+        imu_pitch_offset_rad_ = yaml["imu_pitch_offset_deg"].as<double>() * M_PI / 180.0;
+    }
+    if (yaml["imu_yaw_offset_rad"]) {
+        imu_yaw_offset_rad_ = yaml["imu_yaw_offset_rad"].as<double>();
+    }
+    if (yaml["imu_pitch_offset_rad"]) {
+        imu_pitch_offset_rad_ = yaml["imu_pitch_offset_rad"].as<double>();
+    }
+    if (yaml["cboard_debug_log"]) {
+        cboard_debug_log_ = yaml["cboard_debug_log"].as<bool>();
+    }
+    last_debug_log_time_ = std::chrono::steady_clock::now();
 
     tools::logger()->info("[Cboard] Waiting for q...");
 
@@ -145,9 +171,20 @@ void CBoard::read_fun_1(Message_phoenix& msg) {
     auto timestamp = std::chrono::steady_clock::now();
 
     Autoaim_s data = reinterpret_cast<Autoaim_s&>(msg.data);
-    this->bullet_speed = data.bullet_speed;
-    double yaw      = data.yaw;
-    double pitch    = data.pitch;
+    double raw_bullet_speed = data.bullet_speed;
+    if (use_default_bullet_speed_) {
+        this->bullet_speed = default_bullet_speed_;
+    } else if (std::isfinite(raw_bullet_speed) && raw_bullet_speed >= 1.0) {
+        this->bullet_speed = raw_bullet_speed;
+    } else if (cboard_debug_log_) {
+        tools::logger()->warn(
+            "[CBoard] Invalid bullet speed from MCU: raw={:.3f}. Keep fallback/current v={:.3f}",
+            raw_bullet_speed, this->bullet_speed);
+    }
+    double raw_yaw = data.yaw;
+    double raw_pitch = data.pitch;
+    double yaw      = raw_yaw;
+    double pitch    = raw_pitch;
 
     // // 记录原始读取值，便于排查数据格式/协议问题
     // tools::logger()->debug("[CBoard] raw angles: yaw={}, pitch={}, degrees_flag={}", yaw, pitch,
@@ -160,6 +197,9 @@ void CBoard::read_fun_1(Message_phoenix& msg) {
         pitch *= kDeg2Rad;
     }
 
+    yaw += imu_yaw_offset_rad_;
+    pitch += imu_pitch_offset_rad_;
+
     // 合法性检查：排除 NaN/Inf 或极端错误值，避免产生非法四元数
     if (!std::isfinite(yaw) || !std::isfinite(pitch) || std::abs(yaw) > 1e4 || std::abs(pitch) > 1e4) {
         tools::logger()->error("[CBoard] Invalid IMU angles, skipping sample: yaw={}, pitch={}", yaw, pitch);
@@ -171,6 +211,19 @@ void CBoard::read_fun_1(Message_phoenix& msg) {
     Eigen::AngleAxisd pitch_aa(pitch, Eigen::Vector3d::UnitY());
     Eigen::Quaterniond q = (yaw_aa * pitch_aa).normalized();
     queue_.push({ q, timestamp });
+
+    if (cboard_debug_log_) {
+        auto dt = std::chrono::duration<double>(timestamp - last_debug_log_time_).count();
+        if (dt > 0.5) {
+            tools::logger()->info(
+                "[CBoard] raw(yaw={:.3f}, pitch={:.3f}, v={:.3f}) unit={} -> parsed(yaw={:.3f}rad, pitch={:.3f}rad, v={:.3f}, source={})",
+                raw_yaw, raw_pitch, raw_bullet_speed,
+                phoenix_angles_in_degrees_ ? "deg" : "rad",
+                yaw, pitch, this->bullet_speed,
+                use_default_bullet_speed_ ? "yaml_default" : "mcu_or_fallback");
+            last_debug_log_time_ = timestamp;
+        }
+    }
 }
 
 std::string CBoard::findFirstACMDevice() {

@@ -49,6 +49,8 @@ public:
   void set_jump_params(double z_threshold, int confirm_count);
   void set_jump_avg_alpha(double alpha);
   void set_jump_fire_cooldown(double seconds);
+  void set_jump_fire_cooldown_params(
+    double min_seconds, double max_seconds, double speed_start, double speed_end);
   void set_jump_min_interval(double seconds);
   bool in_jump_fire_cooldown(std::chrono::steady_clock::time_point t) const;
 
@@ -78,6 +80,10 @@ private:
   std::array<double, 4> jump_avg_z_;
   std::array<bool, 4> jump_avg_inited_;
   double jump_fire_cooldown_;
+  double jump_fire_cooldown_min_;
+  double jump_fire_cooldown_max_;
+  double jump_fire_cooldown_speed_start_;
+  double jump_fire_cooldown_speed_end_;
   double jump_min_interval_;
 
   tools::ExtendedKalmanFilter ekf_;

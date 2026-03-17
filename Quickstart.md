@@ -1,74 +1,170 @@
 # 快速开始 (Quickstart)
-##  运行 (Run)
 
-### 启动主程序
+## 编译 (Build)
+
 ```bash
-./build/standard configs/standard3.yaml
+cmake -B build
+cmake --build build -j$(nproc)
 ```
+
+如果只需编译某个特定目标（例如步兵主程序），可以加 `--target`：
+
+```bash
+cmake --build build --target standard_mpc_se -j$(nproc)
+```
+
+---
+
+## 运行 (Run)
+
+### 主程序
+
+**当前标准步兵自瞄程序为 `standard_mpc_se`**，使用串口 CBoard 通信，支持多线程推理和完整火控逻辑：
+
+```bash
+./build/standard_mpc_se configs/standard3.yaml
+```
+
+> 配置文件按机器人选择，`standard3.yaml` / `standard4.yaml` 等对应不同机器人。
+
+---
 
 ### 单元测试
 
 #### 相机测试
 验证相机是否能正常出图：
 ```bash
-./build/camera_test --config-path=configs/standard3.yaml --display
+./build/camera_test --config-path=configs/sentry_blue.yaml --display
 ```
 
 #### 通信测试
-验证与C板通讯（打印欧拉角+弹速）：
+验证与 C 板通讯（打印欧拉角 + 弹速）：
 ```bash
 ./build/cboard_test configs/standard3.yaml
 ```
 
-## 设置开机自启 (Autostart Setup)
+#### 自瞄离线录像测试
+用录制好的视频和 IMU 数据测试自瞄效果（无需相机和 C 板）：
+```bash
+./build/auto_aim_test
+```
 
-本项目包含 `watchdog.sh` (守护进程) 
+---
 
-### 步骤 1: 检查脚本权限
-确保脚本具有执行权限（如果之前未设置）：
+### 识别模块测试
+
+以下三个程序均只测试识别模块（Detector + YOLO），**不涉及追踪和火控**。
+
+#### MindVision 工业相机识别测试（`camera_detect_test`）
+使用 MindVision 工业相机实时采图并运行识别（包含 Detector 与 YOLO）：
+```bash
+./build/camera_detect_test configs/sentry_blue.yaml
+# 显示识别画面（需要有显示器）
+./build/camera_detect_test configs/sentry_blue.yaml --display
+```
+> 可加 `--tradition=true` 切换为传统识别方法。
+
+#### 离线视频识别测试（`detector_video_test`）
+读取本地 `.avi` 视频文件，逐帧运行识别，**无需相机**，适合调参和验证模型：
+```bash
+./build/detector_video_test --config-path=configs/sentry_blue.yaml <视频路径>
+```
+> 可通过 `--start-index` / `--end-index` 指定视频起止帧。
+
+#### USB 摄像头识别测试（`usbcamera_detect_test`）
+使用 USB 摄像头实时采图并运行 YOLO 识别，需使用含 `image_width` / `usb_exposure` 等 USB 相机字段的 yaml（如 `uav.yaml`）：
+```bash
+./build/usbcamera_detect_test configs/uav.yaml --name=video0 --display
+```
+> `--name` 指定设备名，默认 `video0`。**不可使用 MindVision 相机的 yaml（如 `sentry_blue.yaml`）**，否则会报 `image_width not found`。
+
+---
+
+### 识别 + 追踪 + 瞄准测试（无需下位机）
+
+#### 相机追踪测试（`camera_track_test`）
+使用 MindVision 相机实时采图，运行完整的 YOLO → Tracker → Aimer 链路，**不需要 CBoard 或串口**。
+IMU 姿态固定为单位四元数（等效云台水平静止），弹速从 yaml 中读取 `bullet_speed` 字段。
+```bash
+./build/camera_track_test configs/sentry_blue.yaml
+```
+- 窗口显示追踪重投影（黄色框）
+- 终端打印追踪状态、瞄准角度、是否触发射击
+- PlotJuggler 可实时接收 `target_x/y/z/w`、`cmd_yaw/pitch`、`shoot` 等数据
+> 可通过 `--speed=15.0` 覆盖 yaml 中的弹速。
+
+---
+
+## 开机自启 (Autostart)
+
+本项目使用 `watchdog.sh` 作为守护进程，由 systemd 服务在开机时拉起。
+
+### 步骤 1：确保脚本有执行权限
+
 ```bash
 chmod +x /home/setsuna/RM/AutoAim/sp_vision_25/watchdog.sh
 ```
 
-### 步骤 3: 验证
-重启或注销登录后，打开终端使用 screen 查看运行状态：
+### 步骤 2：确认 watchdog.sh 配置正确
+
+`watchdog.sh` 中关键配置项：
+
 ```bash
-# 进入会话查看实时日志
-journalctl -u sp_vision.service -f
+BIN_PATH="./build/standard_mpc_se"       # 运行的可执行文件
+CONFIG_PATH="configs/standard3.yaml"      # 配置文件路径
 ```
 
-### 步骤 4: 停止自启程序
-如果需要停止后台运行的自瞄程序：
+ROS 2 环境变量（如需要）已在脚本开头自动 source：
 ```bash
-pkill -f watchdog.sh
-pkill -f standard
-# 或者在 screen 会话中按 Ctrl+C
-```
-### 在 watchdog.sh 中添加 ROS 2 环境变量
-在 `watchdog.sh` 脚本的开头部分添加以下内容，以确保
-# Source ROS 2 environment (Jazzy)  记得修改为你的 ROS 2 版本路径
-
 if [ -f /opt/ros/jazzy/setup.bash ]; then
     source /opt/ros/jazzy/setup.bash
 fi
+```
+> 如使用其他 ROS 版本，修改路径即可。
 
-### 修改开机自启动后，请重新执行以下命令以应用更改：
+### 步骤 3：重载并启动 systemd 服务
+
+修改过 `watchdog.sh` 或服务文件后，需要重载：
+
 ```bash
 sudo systemctl daemon-reload
 sudo systemctl restart sp_vision.service
-# 验证服务状态
+```
+
+验证运行状态：
+```bash
 sudo systemctl status sp_vision.service
 ```
 
-### 修改源代码后记得重新编译项目：
+### 步骤 4：查看实时日志
+
 ```bash
-mkdir -p build
-cd build
-cmake ..
-make standard_mpc_se -j4
-### 这里以 standard_mpc_se 为例，根据需要编译相应的可执行文件
+journalctl -u sp_vision.service -f
 ```
+
+### 步骤 5：停止自启程序
+
 ```bash
-## 或者直接
-cmake --build build 
+sudo systemctl stop sp_vision.service
+# 或直接杀进程
+pkill -f watchdog.sh
+pkill -f standard_mpc_se
 ```
+
+---
+
+## 修改代码后重新编译
+
+```bash
+cmake --build build --target standard_mpc_se -j$(nproc)
+```
+
+然后重启服务使其生效：
+```bash
+sudo systemctl restart sp_vision.service
+```
+
+## Impovements in progress
+- 动态调整ROI大小以适应目标距离变化（较重要）
+- 引入自适应增益以提升不同速度下的跟随性能
+- 

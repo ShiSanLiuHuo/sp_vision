@@ -85,6 +85,12 @@ private:
     // Phoenix 下位机上报的 yaw/pitch 单位；默认按 rad 解析。
     // 可在 yaml 里配置：phoenix_angle_unit: deg|rad
     bool phoenix_angles_in_degrees_ = false;
+    double imu_yaw_offset_rad_ = 0.0;
+    double imu_pitch_offset_rad_ = 0.0;
+    bool use_default_bullet_speed_ = false;
+    double default_bullet_speed_ = 21.0;
+    bool cboard_debug_log_ = false;
+    std::chrono::steady_clock::time_point last_debug_log_time_;
 
     std::string findFirstACMDevice();
 

@@ -244,7 +244,7 @@ void YOLO11::draw_detections(
       "{:.2f} {} {} {}", armor.confidence, COLORS[armor.color], ARMOR_NAMES[armor.name],
       ARMOR_TYPES[armor.type]);
     tools::draw_points(detection, armor.points, {0, 255, 0});
-    tools::draw_text(detection, info, armor.center, {0, 255, 0});
+    tools::draw_text(detection, info, armor.box.tl() + cv::Point(0, -15), {0, 255, 0});
   }
 
   if (use_roi_) {

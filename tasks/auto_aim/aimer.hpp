@@ -40,6 +40,11 @@ private:
   double comming_angle_high_;
   double leaving_angle_high_;
   double speed_angle_;
+  double comming_end_angle_;
+  double leaving_end_angle_;
+  double speed_angle_max_;
+  double outpost_comming_angle_;
+  double outpost_leaving_angle_;
   double lock_id_ = -1;
   double high_speed_delay_time_;
   double low_speed_delay_time_;

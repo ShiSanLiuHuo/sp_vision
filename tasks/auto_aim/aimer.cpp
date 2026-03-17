@@ -19,21 +19,43 @@ Aimer::Aimer(const std::string & config_path)
   pitch_offset_ = yaml["pitch_offset"].as<double>() / 57.3;    // degree to rad
   comming_angle_ = yaml["comming_angle"].as<double>() / 57.3;  // degree to rad
   leaving_angle_ = yaml["leaving_angle"].as<double>() / 57.3;  // degree to rad
-    comming_angle_high_ = comming_angle_;
-    leaving_angle_high_ = leaving_angle_;
+  comming_angle_high_ = comming_angle_;
+  leaving_angle_high_ = leaving_angle_;
+  comming_end_angle_ = comming_angle_high_;
+  leaving_end_angle_ = leaving_angle_high_;
+  outpost_comming_angle_ = 70 / 57.3;
+  outpost_leaving_angle_ = 30 / 57.3;
   high_speed_delay_time_ = yaml["high_speed_delay_time"].as<double>();
   low_speed_delay_time_ = yaml["low_speed_delay_time"].as<double>();
   decision_speed_ = yaml["decision_speed"].as<double>();
-    speed_angle_ = decision_speed_;
-    if (yaml["comming_angle_high"].IsDefined()) {
-      comming_angle_high_ = yaml["comming_angle_high"].as<double>() / 57.3;
-    }
-    if (yaml["leaving_angle_high"].IsDefined()) {
-      leaving_angle_high_ = yaml["leaving_angle_high"].as<double>() / 57.3;
-    }
-    if (yaml["speed_angle"].IsDefined()) {
-      speed_angle_ = yaml["speed_angle"].as<double>();
-    }
+  speed_angle_ = decision_speed_;
+  speed_angle_max_ = speed_angle_;
+  if (yaml["comming_angle_high"].IsDefined()) {
+    comming_angle_high_ = yaml["comming_angle_high"].as<double>() / 57.3;
+  }
+  if (yaml["leaving_angle_high"].IsDefined()) {
+    leaving_angle_high_ = yaml["leaving_angle_high"].as<double>() / 57.3;
+  }
+  if (yaml["outpost_comming_angle"].IsDefined()) {
+    outpost_comming_angle_ = yaml["outpost_comming_angle"].as<double>() / 57.3;
+  }
+  if (yaml["outpost_leaving_angle"].IsDefined()) {
+    outpost_leaving_angle_ = yaml["outpost_leaving_angle"].as<double>() / 57.3;
+  }
+  if (yaml["comming_end_angle"].IsDefined()) {
+    comming_end_angle_ = yaml["comming_end_angle"].as<double>() / 57.3;
+  }
+  if (yaml["leaving_end_angle"].IsDefined()) {
+    leaving_end_angle_ = yaml["leaving_end_angle"].as<double>() / 57.3;
+  }
+  if (yaml["speed_angle"].IsDefined()) {
+    speed_angle_ = yaml["speed_angle"].as<double>();
+  }
+  if (yaml["speed_angle_max"].IsDefined()) {
+    speed_angle_max_ = yaml["speed_angle_max"].as<double>();
+  } else {
+    speed_angle_max_ = speed_angle_;
+  }
   jump_pitch_up_ = 0.0;
   jump_pitch_down_ = 0.0;
   jump_pitch_up_duration_ = 0.0;
@@ -235,15 +257,21 @@ AimPoint Aimer::choose_aim_point(const Target & target)
 
   double coming_angle, leaving_angle;
   if (target.name == ArmorName::outpost) {
-    coming_angle = 70 / 57.3;
-    leaving_angle = 30 / 57.3;
+    coming_angle = outpost_comming_angle_;
+    leaving_angle = outpost_leaving_angle_;
   } else {
-    if (std::abs(ekf_x[7]) >= speed_angle_) {
-      coming_angle = comming_angle_high_;
-      leaving_angle = leaving_angle_high_;
-    } else {
+    const double abs_w = std::abs(ekf_x[7]);
+    if (abs_w < speed_angle_) {
       coming_angle = comming_angle_;
       leaving_angle = leaving_angle_;
+    } else if (abs_w >= speed_angle_max_) {
+      coming_angle = comming_end_angle_;
+      leaving_angle = leaving_end_angle_;
+    } else {
+      const double denom = speed_angle_max_ - speed_angle_;
+      const double t = denom > 1e-6 ? (abs_w - speed_angle_) / denom : 1.0;
+      coming_angle = comming_angle_high_ + t * (comming_end_angle_ - comming_angle_high_);
+      leaving_angle = leaving_angle_high_ + t * (leaving_end_angle_ - leaving_angle_high_);
     }
   }
 

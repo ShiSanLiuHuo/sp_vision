@@ -42,6 +42,12 @@ private:
   int jump_confirm_count_;
   double jump_avg_alpha_;
   double jump_fire_cooldown_;
+  double jump_fire_cooldown_min_;
+  double jump_fire_cooldown_max_;
+  double jump_fire_cooldown_speed_start_;
+  double jump_fire_cooldown_speed_end_;
+  bool jump_fire_cooldown_dynamic_;
+  double outpost_jump_fire_cooldown_;
   double jump_min_interval_;
   std::string state_, pre_state_;
   Target target_;
