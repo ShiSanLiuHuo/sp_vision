@@ -43,7 +43,7 @@ add_executable(auto_buff_debug src/auto_buff_debug.cpp)
 add_executable(auto_buff_debug_mpc src/auto_buff_debug_mpc.cpp)
 add_executable(uav src/uav.cpp)
 add_executable(uav_debug src/uav_debug.cpp)
-add_executable(standard_mpc_se src/standard_mpc_se.cpp)
+
 
 target_link_libraries(standard ${OpenCV_LIBS} fmt::fmt yaml-cpp auto_aim auto_buff tools io)
 target_link_libraries(mt_standard ${OpenCV_LIBS} fmt::fmt yaml-cpp auto_aim auto_buff tools io)
@@ -54,7 +54,7 @@ target_link_libraries(auto_buff_debug ${OpenCV_LIBS} fmt::fmt yaml-cpp auto_buff
 target_link_libraries(auto_buff_debug_mpc ${OpenCV_LIBS} fmt::fmt yaml-cpp auto_buff tools io ${CERES_LIBRARIES})
 target_link_libraries(uav ${OpenCV_LIBS} fmt::fmt yaml-cpp auto_aim auto_buff tools io)
 target_link_libraries(uav_debug ${OpenCV_LIBS} fmt::fmt yaml-cpp auto_aim tools io)
-target_link_libraries(standard_mpc_se ${OpenCV_LIBS} fmt::fmt yaml-cpp auto_aim auto_buff tools io)
+
 
 ##################calibration################
 add_executable(capture calibration/capture.cpp)
@@ -133,6 +133,7 @@ if(ament_cmake_FOUND AND rclcpp_FOUND AND std_msgs_FOUND AND rosidl_typesupport_
     # add_executable(sentry_multithread src/sentry_multithread.cpp)
     add_executable(publish_test tests/publish_test.cpp)
     add_executable(subscribe_test tests/subscribe_test.cpp)
+    add_executable(standard_mpc_se src/standard_mpc_se.cpp)
     # add_executable(topic_loop_test tests/topic_loop_test.cpp)
 
     # target_link_libraries(sentry ${OpenCV_LIBS} fmt::fmt yaml-cpp auto_aim omniperception tools io)
@@ -141,6 +142,7 @@ if(ament_cmake_FOUND AND rclcpp_FOUND AND std_msgs_FOUND AND rosidl_typesupport_
     # target_link_libraries(sentry_multithread ${OpenCV_LIBS} fmt::fmt yaml-cpp auto_aim omniperception tools io)
     target_link_libraries(publish_test ${OpenCV_LIBS} fmt::fmt tools io auto_aim io ${communicate_2025_LIBRARIES})
     target_link_libraries(subscribe_test ${OpenCV_LIBS} fmt::fmt tools io auto_aim io ${communicate_2025_LIBRARIES})
+    target_link_libraries(standard_mpc_se ${OpenCV_LIBS} fmt::fmt yaml-cpp auto_aim auto_buff tools io ${communicate_2025_LIBRARIES})
     # target_link_libraries(topic_loop_test ${OpenCV_LIBS} fmt::fmt tools io auto_aim io ${communicate_2025_LIBRARIES})
 else()
     message(STATUS "ROS2 environment not found, skipping ROS2-related code.")

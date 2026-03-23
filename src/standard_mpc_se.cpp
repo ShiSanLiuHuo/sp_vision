@@ -13,8 +13,13 @@
 #include <opencv2/opencv.hpp>
 #include <yaml-cpp/yaml.h>
 
+#include <optional>
+#include "rclcpp/rclcpp.hpp"
+#include "io/ros2/subscribe2nav.hpp"
+#include "io/ros2/publish2nav.hpp"
+
 #include "io/camera.hpp"
-#include "io/cboard.hpp"
+#include "io/ros2/ros2.hpp"
 #include "tasks/auto_aim/aimer.hpp"
 #include "tasks/auto_aim/planner/planner.hpp"
 #include "tasks/auto_aim/multithread/commandgener.hpp"
@@ -85,8 +90,40 @@ int main(int argc, char* argv[]) {
     tools::Plotter plotter;
     tools::Recorder recorder;
 
-    io::CBoard cboard(config_path);
+    // Replace direct CBoard usage with ROS2-based interface
+    // Read minimal cboard-related config fields from YAML so behavior remains similar
+    double cboard_bullet_speed = 21.0;
+    bool cboard_use_default_bullet_speed = false;
+    bool phoenix_angles_in_degrees = false;
+    double imu_yaw_offset_rad = 0.0;
+    double imu_pitch_offset_rad = 0.0;
+    try {
+        auto yaml = YAML::LoadFile(config_path);
+        if (yaml["bullet_speed"]) cboard_bullet_speed = yaml["bullet_speed"].as<double>();
+        if (yaml["use_default_bullet_speed"]) cboard_use_default_bullet_speed = yaml["use_default_bullet_speed"].as<bool>();
+        if (yaml["phoenix_angle_unit"]) {
+            auto unit = yaml["phoenix_angle_unit"].as<std::string>();
+            for (auto &c: unit) c = static_cast<char>(std::tolower(c));
+            phoenix_angles_in_degrees = (unit == "deg" || unit == "degree" || unit == "degrees");
+        }
+        if (yaml["imu_yaw_offset_deg"]) imu_yaw_offset_rad = yaml["imu_yaw_offset_deg"].as<double>() * M_PI / 180.0;
+        if (yaml["imu_pitch_offset_deg"]) imu_pitch_offset_rad = yaml["imu_pitch_offset_deg"].as<double>() * M_PI / 180.0;
+        if (yaml["imu_yaw_offset_rad"]) imu_yaw_offset_rad = yaml["imu_yaw_offset_rad"].as<double>();
+        if (yaml["imu_pitch_offset_rad"]) imu_pitch_offset_rad = yaml["imu_pitch_offset_rad"].as<double>();
+    } catch (const YAML::Exception & e) {
+        tools::logger()->warn("Failed to read cboard config from {}: {}", config_path, e.what());
+    }
+
     io::Camera camera(config_path);
+
+    // Initialize ROS2 and IO wrappers (non-blocking): Subscribe to autoaim and publish commands
+    rclcpp::init(argc, argv);
+    auto nav_sub = std::make_shared<io::Subscribe2Nav>();
+    auto pub_node = std::make_shared<io::Publish2Nav>();
+    std::thread nav_thread([nav_sub]() { nav_sub->start(); });
+    nav_thread.detach();
+    std::thread pub_thread([pub_node]() { pub_node->start(); });
+    pub_thread.detach();
 
     auto_aim::YOLO detector(config_path, false);
     auto_aim::Solver solver(config_path);
@@ -110,8 +147,33 @@ int main(int argc, char* argv[]) {
 
     while (!exiter.exit()) {
         camera.read(img, t);
-        q    = use_identity_pose ? Eigen::Quaterniond::Identity() : cboard.imu_at(t - 1ms);
-        mode = cboard.mode;
+    // try to get latest autoaim data from ROS2; if absent, fall back to identity quaternion
+    std::optional<io::AutoaimData> maybe = std::nullopt;
+        // Subscribe2Nav exposes get_autoaim_data()
+        if (nav_sub) {
+            maybe = nav_sub->get_autoaim_data();
+        }
+
+        if (use_identity_pose) {
+            q = Eigen::Quaterniond::Identity();
+        } else if (maybe.has_value()) {
+            auto ad = maybe.value();
+            double yaw = static_cast<double>(ad.high_gimbal_yaw);
+            double pitch = static_cast<double>(ad.pitch);
+            if (phoenix_angles_in_degrees) {
+                constexpr double kDeg2Rad = M_PI / 180.0;
+                yaw *= kDeg2Rad;
+                pitch *= kDeg2Rad;
+            }
+            yaw += imu_yaw_offset_rad;
+            pitch += imu_pitch_offset_rad;
+            Eigen::AngleAxisd yaw_aa(yaw, Eigen::Vector3d::UnitZ());
+            Eigen::AngleAxisd pitch_aa(pitch, Eigen::Vector3d::UnitY());
+            q = (yaw_aa * pitch_aa).normalized();
+            mode = static_cast<io::Mode>(ad.mode);
+        } else {
+            q = Eigen::Quaterniond::Identity();
+        }
 
         if (last_mode != mode) {
             tools::logger()->info("Switch to {}", io::MODES[mode].c_str());
@@ -131,10 +193,10 @@ int main(int argc, char* argv[]) {
         auto tracker_start = std::chrono::steady_clock::now();
         auto targets       = tracker.track(armors, t);
         auto aimer_start   = std::chrono::steady_clock::now();
-        auto command       = aimer.aim(targets, t, cboard.bullet_speed);
+        auto command       = aimer.aim(targets, t, cboard_bullet_speed);
         
         if (!targets.empty()) {
-            auto plan = planner.plan(targets.front(), cboard.bullet_speed);
+            auto plan = planner.plan(targets.front(), cboard_bullet_speed);
             if (plan.control) {
                 command.yaw       = plan.yaw;
                 command.pitch     = plan.pitch;
@@ -324,7 +386,15 @@ int main(int argc, char* argv[]) {
             }
         }
 
-        cboard.send(command);
+        // send command via ROS2 publisher node
+        if (pub_node) {
+            Eigen::Vector4d out;
+            out[0] = command.yaw;
+            out[1] = command.pitch;
+            out[2] = 0.0; // reserved
+            out[3] = command.control ? 1.0 : 0.0; // is_find flag
+            pub_node->send_data(out);
+        }
         frame_count++;
     }
         // 在程序结束时输出识别率
