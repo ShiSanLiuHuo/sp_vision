@@ -10,7 +10,7 @@
 #include <string>
 
 #include "rclcpp/rclcpp.hpp"
-#include "std_msgs/msg/string.hpp"
+#include "communicate_2025/msg/serial_info.hpp"
 
 namespace io
 {
@@ -27,7 +27,7 @@ public:
 
 private:
   // ROS2 发布者
-  rclcpp::Publisher<std_msgs::msg::String>::SharedPtr publisher_;
+  rclcpp::Publisher<communicate_2025::msg::SerialInfo>::SharedPtr publisher_;
 };
 
 }  // namespace io

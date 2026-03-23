@@ -17,6 +17,30 @@ add_library(io STATIC
     serial_phoenix/src/serial.cpp
 )
 
+# 检查 ROS 环境，如果存在则添加ROS2相关文件
+find_package(ament_cmake QUIET)
+find_package(rclcpp QUIET)
+find_package(std_msgs QUIET)
+find_package(rosidl_typesupport_cpp QUIET)
+find_package(communicate_2025 QUIET)
+ 
+if(ament_cmake_FOUND AND rclcpp_FOUND AND std_msgs_FOUND AND rosidl_typesupport_cpp_FOUND AND communicate_2025_FOUND)
+    # 添加ROS2源文件
+    target_sources(io PRIVATE 
+        ros2/ros2.cpp
+        ros2/publish2nav.cpp
+        ros2/subscribe2nav.cpp
+    )
+    
+    # 添加ROS2包含目录
+    target_include_directories(io PUBLIC ros2)
+    target_include_directories(io PUBLIC ${communicate_2025_INCLUDE_DIRS})
+    
+    # 链接ROS2库
+    target_link_libraries(io ${rclcpp_LIBRARIES} ${communicate_2025_LIBRARIES})
+endif()
+ 
+
 # hikrobot
 target_include_directories(io PUBLIC hikrobot/include)
 if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64")

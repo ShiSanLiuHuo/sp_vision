@@ -168,3 +168,12 @@ sudo systemctl restart sp_vision.service
 - 动态调整ROI大小以适应目标距离变化（较重要）
 - 引入自适应增益以提升不同速度下的跟随性能
 - 
+
+## ros2 
+### 消息编译
+```
+cd io/ros2
+source /opt/ros/jazzy/setup.bash && cd /home/ShiSanLiuHuo/sp_vision/io/ros2 && rm -rf build install log && colcon build --packages-select communicate_2025 --merge-install
+```
+
+`
