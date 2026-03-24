@@ -125,7 +125,43 @@ int main(int argc, char* argv[]) {
     std::thread pub_thread([pub_node]() { pub_node->start(); });
     pub_thread.detach();
 
-    auto_aim::YOLO detector(config_path, false);
+    // Enable YOLO debug display to help diagnose detection issues (shows detection window)
+    auto_aim::YOLO detector(config_path, true);
+
+    // Log YOLO/model configuration for debugging
+    try {
+        auto yaml = YAML::LoadFile(config_path);
+        if (yaml["yolo_name"]) {
+            auto yolo_name = yaml["yolo_name"].as<std::string>();
+            tools::logger()->info("yolo_name: {}", yolo_name);
+            std::string model_key;
+            if (yolo_name == "yolov8") model_key = "yolov8_model_path";
+            else if (yolo_name == "yolov5") model_key = "yolov5_model_path";
+            else if (yolo_name == "yolo11") model_key = "yolo11_model_path";
+            if (!model_key.empty() && yaml[model_key]) {
+                tools::logger()->info("{}: {}", model_key, yaml[model_key].as<std::string>());
+            }
+        }
+        if (yaml["min_confidence"]) {
+            tools::logger()->info("min_confidence: {}", yaml["min_confidence"].as<double>());
+        }
+        if (yaml["use_roi"]) {
+            tools::logger()->info("use_roi: {}", yaml["use_roi"].as<bool>());
+            if (yaml["roi"]) {
+                try {
+                    int rx = yaml["roi"]["x"].as<int>();
+                    int ry = yaml["roi"]["y"].as<int>();
+                    int rw = yaml["roi"]["width"].as<int>();
+                    int rh = yaml["roi"]["height"].as<int>();
+                    tools::logger()->info("roi: x={}, y={}, w={}, h={}", rx, ry, rw, rh);
+                } catch (...) {
+                    ;
+                }
+            }
+        }
+    } catch (const YAML::Exception & e) {
+        tools::logger()->warn("Failed to read yolo config for logging: {}", e.what());
+    }
     auto_aim::Solver solver(config_path);
     auto_aim::Tracker tracker(config_path, solver);
     auto_aim::Planner planner(config_path);
@@ -148,10 +184,11 @@ int main(int argc, char* argv[]) {
     while (!exiter.exit()) {
         camera.read(img, t);
     // try to get latest autoaim data from ROS2; if absent, fall back to identity quaternion
-    std::optional<io::AutoaimData> maybe = std::nullopt;
+        std::optional<io::AutoaimData> maybe = std::nullopt;
         // Subscribe2Nav exposes get_autoaim_data()
         if (nav_sub) {
             maybe = nav_sub->get_autoaim_data();
+            tools::logger()->info("maybe has value: {}", maybe.has_value());
         }
 
         if (use_identity_pose) {
