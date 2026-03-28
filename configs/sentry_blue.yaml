@@ -33,7 +33,7 @@ max_rectangular_error: 25 # degree
 
 #####-----tracker参数-----#####
 min_detect_count: 1
-max_temp_lost_count: 3 # 由于识别率很高，所以丢失就是模型错误，直接切换。思想来自SORT
+max_temp_lost_count: 5 # 由于识别率很高，所以丢失就是模型错误，直接切换。思想来自SORT
 outpost_comming_angle: 70 # degree 前哨站进入视野角度
 outpost_leaving_angle: 30 # degree 前哨站离开视野角度
 outpost_max_temp_lost_count: 75
@@ -57,7 +57,7 @@ jump_min_interval: 0.15 # s 跳变最小间隔
 yaw_offset: 1.6   # degree 1.5  系统误差，开火时固定偏向一边TODO:
 pitch_offset: 7.3 # degree 2
 comming_angle: 50 # degree 55
-leaving_angle: 10 # degree 20
+leaving_angle: 20 # degree 20
 comming_angle_high: 50 # degree 高速(角速度大)使用
 leaving_angle_high: 10 # degree 高速(角速度大)使用
 comming_end_angle: 55 # degree 极高速下的最小角度
@@ -65,8 +65,8 @@ leaving_end_angle: 8 # degree 极高速下的最小角度
 speed_angle: 7 # rad/s 角速度阈值(用于comming/leaving切换)
 speed_angle_max: 12 # rad/s 达到该角速度时角度缩减到end_angle
 decision_speed: 7 # rad/s 角速度阈值(用于high_speed_delay_time和low_speed_delay_time)
-high_speed_delay_time: -0.13 # s TODO:??
-low_speed_delay_time: -0.11 # s planner use this value TODO:??
+high_speed_delay_time: 0 # s TODO:?? -0.13
+low_speed_delay_time: 0 # s planner use this value TODO:?? -0.11
 
 #####-----shooter参数-----#####
 first_tolerance: 3 # 近距离射击容差，degree

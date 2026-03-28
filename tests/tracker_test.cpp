@@ -41,11 +41,25 @@ const std::string keys =
     "{@config-path   | configs/standard3.yaml | 位置参数，yaml配置文件路径 }";
 
 int main(int argc, char* argv[]) {
-    cv::CommandLineParser cli(argc, argv, keys);
-    auto config_path = cli.get<std::string>(0);
-    if (cli.has("help") || config_path.empty()) {
-        cli.printMessage();
-        return 0;
+    // 手工解析参数：支持位置参数 config-path，和可选 -v/--video <path>
+    std::string config_path = "configs/standard3.yaml";
+    std::string video_path;
+    bool use_video = false;
+
+    for (int i = 1; i < argc; ++i) {
+        std::string a = argv[i];
+        if (a == "-h" || a == "--help" || a == "-?") {
+            std::cout << "Usage: " << argv[0] << " [config-path] [-v video_path]\n";
+            return 0;
+        }
+        if (a == "-v" || a == "--video") {
+            if (i + 1 < argc) { video_path = argv[++i]; use_video = true; continue; }
+            std::cerr << "-v requires an argument\n";
+            return 1;
+        }
+        if (a.size() > 0 && a[0] != '-') {
+            if (config_path == "configs/standard3.yaml") config_path = a;
+        }
     }
 
     double jump_pitch_up_duration = 0.0;
@@ -114,7 +128,19 @@ int main(int argc, char* argv[]) {
         tools::logger()->warn("Failed to read cboard config from {}: {}", config_path, e.what());
     }
 
-    io::Camera camera(config_path);
+    // Only construct a camera if we are not in video playback mode
+    std::unique_ptr<io::Camera> camera;
+    std::unique_ptr<cv::VideoCapture> video_cap;
+    if (!use_video) {
+        camera = std::make_unique<io::Camera>(config_path);
+    } else {
+        video_cap = std::make_unique<cv::VideoCapture>(video_path);
+        if (!video_cap->isOpened()) {
+            std::cerr << "Failed to open video: " << video_path << std::endl;
+            return 1;
+        }
+        tools::logger()->info("Using video input: {}", video_path);
+    }
 
     // Initialize ROS2 and IO wrappers (non-blocking): Subscribe to autoaim and publish commands
     rclcpp::init(argc, argv);
@@ -172,8 +198,8 @@ int main(int argc, char* argv[]) {
     Eigen::Quaterniond q;
     std::chrono::steady_clock::time_point t;
 
-    // Debugging / profiling counters
-    int debug_log_interval_frames = 200; // print every N frames
+    // profiling counters (same as standard_mpc_se)
+    int debug_log_interval_frames = 200;
     int frames_since_log = 0;
     auto last_log_time = std::chrono::steady_clock::now();
     double acc_cam = 0.0, acc_detect = 0.0, acc_track = 0.0, acc_aim = 0.0, acc_render = 0.0, acc_total = 0.0;
@@ -190,7 +216,20 @@ int main(int argc, char* argv[]) {
     while (!exiter.exit()) {
         auto frame_start = std::chrono::steady_clock::now();
         auto cam_start = std::chrono::steady_clock::now();
-        camera.read(img, t);
+        if (use_video) {
+            if (!video_cap->read(img) || img.empty()) {
+                // loop back to start
+                video_cap->set(cv::CAP_PROP_POS_FRAMES, 0);
+                // try to read again; if still fails, sleep and continue
+                if (!video_cap->read(img) || img.empty()) {
+                    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+                    continue;
+                }
+            }
+            t = std::chrono::steady_clock::now();
+        } else {
+            camera->read(img, t);
+        }
         double cam_dt = tools::delta_time(std::chrono::steady_clock::now(), cam_start);
     // try to get latest autoaim data from ROS2; if absent, fall back to identity quaternion
         std::optional<io::AutoaimData> maybe = std::nullopt;
@@ -226,7 +265,7 @@ int main(int argc, char* argv[]) {
             last_mode = mode;
         }
 
-    recorder.record(img, q, t);
+        recorder.record(img, q, t);
 
         solver.set_R_gimbal2world(q);
 
@@ -254,25 +293,7 @@ int main(int argc, char* argv[]) {
             }
         }
 
-    // total time for this loop (use now - frame_start)
-    auto now_tp = std::chrono::steady_clock::now();
-    double total_dt = tools::delta_time(now_tp, frame_start);
-    // approximate render time as remaining time
-    double render_dt = total_dt - (cam_dt + detect_dt + track_dt + aim_dt);
-    if (render_dt < 0.0) render_dt = 0.0;
-
-    // accumulate
-    acc_cam += cam_dt;
-    acc_detect += detect_dt;
-    acc_track += track_dt;
-    acc_aim += aim_dt;
-    acc_render += render_dt;
-    acc_total += total_dt;
-    frames_since_log++;
-
-    // overlay instantaneous info on image
-    double inst_fps = total_dt > 1e-6 ? 1.0 / total_dt : 0.0;
-    tools::draw_text(img, fmt::format("FPS: {:.1f}", inst_fps), {10, 30}, {0, 255, 0});
+    auto now_tp        = std::chrono::steady_clock::now();
 
         Eigen::Quaterniond gimbal_q = q;
         Eigen::Vector3d ypr         = tools::eulers(gimbal_q.toRotationMatrix(), 2, 1, 0);
@@ -433,15 +454,18 @@ int main(int argc, char* argv[]) {
             data["recent_nis_failures"] = ekf.data.at("recent_nis_failures");
         }
 
-        plotter.plot(data);
+        // compute totals and render estimate
+        double total_dt = tools::delta_time(now_tp, frame_start);
+        double render_dt = total_dt - (cam_dt + detect_dt + track_dt + aim_dt);
+        if (render_dt < 0.0) render_dt = 0.0;
 
-        cv::resize(img, img, {}, 0.9, 0.9);
-        cv::imshow("reprojection", img);
-        auto key = cv::waitKey(1);
-        if (key == 'q')
-            break;
+        // accumulate and overlay
+        acc_cam += cam_dt; acc_detect += detect_dt; acc_track += track_dt; acc_aim += aim_dt; acc_render += render_dt; acc_total += total_dt;
+        frames_since_log++;
+        double inst_fps = total_dt > 1e-6 ? 1.0 / total_dt : 0.0;
+        tools::draw_text(img, fmt::format("FPS: {:.1f}", inst_fps), {10, 30}, {0, 255, 0});
 
-        // periodic logging by frames or time (every debug_log_interval_frames or every 5s)
+        // periodic logging
         auto now = std::chrono::steady_clock::now();
         double elapsed_since_log = std::chrono::duration<double>(now - last_log_time).count();
         if (frames_since_log >= debug_log_interval_frames || elapsed_since_log >= 5.0) {
@@ -454,11 +478,16 @@ int main(int argc, char* argv[]) {
             double fps = frames_since_log / (elapsed_since_log > 0 ? elapsed_since_log : 1.0);
             tools::logger()->info("PROFILE avg over {} frames: fps={:.1f}, total={:.2f}ms, cam={:.2f}ms, detect={:.2f}ms, track={:.2f}ms, aim={:.2f}ms, render={:.2f}ms",
                                  frames_since_log, fps, avg_total, avg_cam, avg_detect, avg_track, avg_aim, avg_render);
-            // reset accumulators
-            frames_since_log = 0;
-            acc_cam = acc_detect = acc_track = acc_aim = acc_render = acc_total = 0.0;
-            last_log_time = now;
+            frames_since_log = 0; acc_cam = acc_detect = acc_track = acc_aim = acc_render = acc_total = 0.0; last_log_time = now;
         }
+
+        plotter.plot(data);
+
+        cv::resize(img, img, {}, 0.9, 0.9);
+        cv::imshow("reprojection", img);
+        auto key = cv::waitKey(1);
+        if (key == 'q')
+            break;
 
         // 平滑过渡逻辑：当目标位置跳变过大时，逐帧过渡而不是直接跳变
         if (enable_target_stabilize && command.control) {

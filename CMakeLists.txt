@@ -88,6 +88,7 @@ add_executable(dm_test tests/dm_test.cpp)
 add_executable(minimum_vision_system tests/minimum_vision_system.cpp)
 
 add_executable(shoot_video tests/shoot_video.cpp)
+add_executable(play_loop tests/play_loop.cpp)
 
 target_link_libraries(auto_aim_test ${OpenCV_LIBS} fmt::fmt yaml-cpp tools io auto_aim)
 target_link_libraries(auto_buff_test ${OpenCV_LIBS} fmt::fmt yaml-cpp auto_buff tools io)
@@ -106,6 +107,8 @@ target_link_libraries(handeye_test ${OpenCV_LIBS} fmt::fmt yaml-cpp tools io aut
 target_link_libraries(dm_test ${OpenCV_LIBS} fmt::fmt yaml-cpp tools io)
 target_link_libraries(minimum_vision_system ${OpenCV_LIBS} fmt::fmt yaml-cpp tools io auto_aim)
 target_link_libraries(shoot_video ${OpenCV_LIBS} fmt::fmt tools io)
+target_link_libraries(play_loop ${OpenCV_LIBS} fmt::fmt tools io)
+
 
 add_executable(tune_exposure tools/tune_exposure.cpp)
 target_link_libraries(tune_exposure ${OpenCV_LIBS} fmt::fmt yaml-cpp tools io auto_aim)
@@ -137,6 +140,7 @@ if(ament_cmake_FOUND AND rclcpp_FOUND AND std_msgs_FOUND AND rosidl_typesupport_
     add_executable(publish_test tests/publish_test.cpp)
     add_executable(subscribe_test tests/subscribe_test.cpp)
     add_executable(standard_mpc_se src/standard_mpc_se.cpp)
+    add_executable(tracker_test tests/tracker_test.cpp)
     # add_executable(topic_loop_test tests/topic_loop_test.cpp)
 
     # target_link_libraries(sentry ${OpenCV_LIBS} fmt::fmt yaml-cpp auto_aim omniperception tools io)
@@ -146,6 +150,7 @@ if(ament_cmake_FOUND AND rclcpp_FOUND AND std_msgs_FOUND AND rosidl_typesupport_
     target_link_libraries(publish_test ${OpenCV_LIBS} fmt::fmt tools io auto_aim io ${communicate_2025_LIBRARIES})
     target_link_libraries(subscribe_test ${OpenCV_LIBS} fmt::fmt tools io auto_aim io ${communicate_2025_LIBRARIES})
     target_link_libraries(standard_mpc_se ${OpenCV_LIBS} fmt::fmt yaml-cpp auto_aim auto_buff tools io ${communicate_2025_LIBRARIES})
+    target_link_libraries(tracker_test ${OpenCV_LIBS} fmt::fmt yaml-cpp nlohmann_json::nlohmann_json tools io auto_aim ${communicate_2025_LIBRARIES})
     # target_link_libraries(topic_loop_test ${OpenCV_LIBS} fmt::fmt tools io auto_aim io ${communicate_2025_LIBRARIES})
 else()
     message(STATUS "ROS2 environment not found, skipping ROS2-related code.")
