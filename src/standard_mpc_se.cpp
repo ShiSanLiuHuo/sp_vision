@@ -226,23 +226,23 @@ int main(int argc, char* argv[]) {
             last_mode = mode;
         }
 
-    recorder.record(img, q, t);
+        recorder.record(img, q, t);
 
         solver.set_R_gimbal2world(q);
 
-    auto yolo_start    = std::chrono::steady_clock::now();
-    auto armors        = detector.detect(img);
-    double detect_dt = tools::delta_time(std::chrono::steady_clock::now(), yolo_start);
-        total_armors += armors.size();  // 累加检测到的装甲板
-        if (!armors.empty()) {
-            detected_frames++;  // 累加检测成功的帧数
-        }
-    auto tracker_start = std::chrono::steady_clock::now();
-    auto targets       = tracker.track(armors, t);
-    double track_dt = tools::delta_time(std::chrono::steady_clock::now(), tracker_start);
-    auto aimer_start   = std::chrono::steady_clock::now();
-    auto command       = aimer.aim(targets, t, cboard_bullet_speed);
-    double aim_dt = tools::delta_time(std::chrono::steady_clock::now(), aimer_start);
+        auto yolo_start    = std::chrono::steady_clock::now();
+        auto armors        = detector.detect(img);
+        double detect_dt = tools::delta_time(std::chrono::steady_clock::now(), yolo_start);
+            total_armors += armors.size();  // 累加检测到的装甲板
+            if (!armors.empty()) {
+                detected_frames++;  // 累加检测成功的帧数
+            }
+        auto tracker_start = std::chrono::steady_clock::now();
+        auto targets       = tracker.track(armors, t);
+        double track_dt = tools::delta_time(std::chrono::steady_clock::now(), tracker_start);
+        auto aimer_start   = std::chrono::steady_clock::now();
+        auto command       = aimer.aim(targets, t, cboard_bullet_speed);
+        double aim_dt = tools::delta_time(std::chrono::steady_clock::now(), aimer_start);
         
         if (!targets.empty()) {
             auto plan = planner.plan(targets.front(), cboard_bullet_speed);

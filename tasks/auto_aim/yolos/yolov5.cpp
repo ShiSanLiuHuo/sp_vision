@@ -26,6 +26,12 @@ YOLOV5::YOLOV5(const std::string & config_path, bool debug)
   height = yaml["roi"]["height"].as<int>();
   use_roi_ = yaml["use_roi"].as<bool>();
   use_traditional_ = yaml["use_traditional"].as<bool>();
+  if (yaml["async_infer"]) {
+    async_infer_ = yaml["async_infer"].as<bool>();
+  }
+  if (yaml["infer_queue_size"]) {
+    infer_queue_size_ = static_cast<size_t>(std::max(1, yaml["infer_queue_size"].as<int>()));
+  }
   roi_ = cv::Rect(x, y, width, height);
   offset_ = cv::Point2f(x, y);
 
@@ -52,9 +58,101 @@ YOLOV5::YOLOV5(const std::string & config_path, bool debug)
   model = ppp.build();
   compiled_model_ = core_.compile_model(
     model, device_, ov::hint::performance_mode(ov::hint::PerformanceMode::LATENCY));
+
+  if (async_infer_) {
+    infer_thread_ = std::thread(&YOLOV5::infer_worker, this);
+    tools::logger()->info("YOLOV5 async infer enabled, queue size={}", infer_queue_size_);
+  } else {
+    tools::logger()->info("YOLOV5 async infer disabled, running sync infer");
+  }
+}
+
+YOLOV5::~YOLOV5()
+{
+  if (async_infer_) {
+    {
+      std::lock_guard<std::mutex> lk(infer_mtx_);
+      stop_infer_thread_ = true;
+    }
+    infer_cv_.notify_all();
+    if (infer_thread_.joinable()) {
+      infer_thread_.join();
+    }
+  }
 }
 
 std::list<Armor> YOLOV5::detect(const cv::Mat & raw_img, int frame_count)
+{
+  if (!async_infer_) {
+    return infer_once(raw_img, frame_count);
+  }
+
+  if (raw_img.empty()) {
+    tools::logger()->warn("Empty img!, camera drop!");
+    return std::list<Armor>();
+  }
+
+  {
+    std::lock_guard<std::mutex> lk(infer_mtx_);
+    if (infer_queue_.size() >= infer_queue_size_) {
+      // keep real-time behavior: drop oldest input frame
+      infer_queue_.pop_front();
+    }
+    infer_queue_.push_back({raw_img.clone(), frame_count});
+  }
+  infer_cv_.notify_one();
+
+  // non-blocking fetch latest available result
+  std::list<Armor> latest;
+  cv::Mat latest_raw_img;
+  int latest_frame_count = frame_count;
+  {
+    std::lock_guard<std::mutex> lk(infer_mtx_);
+    while (!result_queue_.empty()) {
+      latest_frame_count = result_queue_.front().frame_count;
+      latest_raw_img = result_queue_.front().raw_img_for_debug;
+      latest = std::move(result_queue_.front().armors);
+      result_queue_.pop_front();
+    }
+  }
+
+  // GUI must run in main thread
+  if (debug_ && !latest.empty() && !latest_raw_img.empty()) {
+    draw_detections(latest_raw_img, latest, latest_frame_count);
+  }
+  return latest;
+}
+
+void YOLOV5::infer_worker()
+{
+  while (true) {
+    InferTask task;
+    {
+      std::unique_lock<std::mutex> lk(infer_mtx_);
+      infer_cv_.wait(lk, [this]() { return stop_infer_thread_ || !infer_queue_.empty(); });
+
+      if (stop_infer_thread_ && infer_queue_.empty()) {
+        break;
+      }
+
+      // take newest frame and drop stale ones to reduce latency
+      task = std::move(infer_queue_.back());
+      infer_queue_.clear();
+    }
+
+    auto armors = infer_once(task.raw_img, task.frame_count);
+
+    {
+      std::lock_guard<std::mutex> lk(infer_mtx_);
+      if (result_queue_.size() >= infer_queue_size_) {
+        result_queue_.pop_front();
+      }
+      result_queue_.push_back({task.frame_count, std::move(armors), task.raw_img});
+    }
+  }
+}
+
+std::list<Armor> YOLOV5::infer_once(const cv::Mat & raw_img, int frame_count)
 {
   if (raw_img.empty()) {
     tools::logger()->warn("Empty img!, camera drop!");
@@ -89,7 +187,10 @@ std::list<Armor> YOLOV5::detect(const cv::Mat & raw_img, int frame_count)
   // infer
   auto infer_request = compiled_model_.create_infer_request();
   infer_request.set_input_tensor(input_tensor);
+  std::chrono::steady_clock::time_point yolo_start = std::chrono::steady_clock::now();
   infer_request.infer();
+  std::chrono::steady_clock::time_point yolo_end = std::chrono::steady_clock::now();
+  tools::logger()->debug("yolo infer time: {}", std::chrono::duration_cast<std::chrono::nanoseconds>(yolo_end - yolo_start).count()/1e6);
 
   // postprocess
   auto output_tensor = infer_request.get_output_tensor();
@@ -187,7 +288,8 @@ std::list<Armor> YOLOV5::parse(
     ++it;
   }
 
-  if (debug_) draw_detections(bgr_img, armors, frame_count);
+  // In async mode, GUI rendering is done in detect() on main thread.
+  if (debug_ && !async_infer_) draw_detections(bgr_img, armors, frame_count);
 
   return armors;
 }

@@ -10,6 +10,8 @@ yolov5_model_path: assets/yolov5.xml
 device: CPU
 min_confidence: 0.75
 use_traditional: true
+async_infer: true
+infer_queue_size: 2
 
 #####-----ROI-----#####
 roi: 
@@ -75,7 +77,7 @@ judge_distance: 2 #距离判断阈值
 auto_fire: true # 是否由自瞄控制射击
 
 camera_name: mindvision
-exposure_ms: 7
+exposure_ms: 10
 gamma: 0.9
 gain: 0
 vid_pid: f622:d132
