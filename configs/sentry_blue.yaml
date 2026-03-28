@@ -33,7 +33,7 @@ max_rectangular_error: 25 # degree
 
 #####-----tracker参数-----#####
 min_detect_count: 1
-max_temp_lost_count: 3
+max_temp_lost_count: 3 # 由于识别率很高，所以丢失就是模型错误，直接切换。思想来自SORT
 outpost_comming_angle: 70 # degree 前哨站进入视野角度
 outpost_leaving_angle: 30 # degree 前哨站离开视野角度
 outpost_max_temp_lost_count: 75
@@ -54,7 +54,7 @@ jump_pitch_up_duration: 0.15 # s
 jump_pitch_down_duration: 0.25 # s
 jump_min_interval: 0.15 # s 跳变最小间隔
 #####-----aimer参数-----#####
-yaw_offset: 1.6   # degree 1.5
+yaw_offset: 1.6   # degree 1.5  系统误差，开火时固定偏向一边TODO:
 pitch_offset: 7.3 # degree 2
 comming_angle: 50 # degree 55
 leaving_angle: 10 # degree 20
@@ -64,9 +64,9 @@ comming_end_angle: 55 # degree 极高速下的最小角度
 leaving_end_angle: 8 # degree 极高速下的最小角度
 speed_angle: 7 # rad/s 角速度阈值(用于comming/leaving切换)
 speed_angle_max: 12 # rad/s 达到该角速度时角度缩减到end_angle
-decision_speed: 7 # rad/s
-high_speed_delay_time: -0.13 # s
-low_speed_delay_time: -0.11 # s planner use this value
+decision_speed: 7 # rad/s 角速度阈值(用于high_speed_delay_time和low_speed_delay_time)
+high_speed_delay_time: -0.13 # s TODO:??
+low_speed_delay_time: -0.11 # s planner use this value TODO:??
 
 #####-----shooter参数-----#####
 first_tolerance: 3 # 近距离射击容差，degree
@@ -127,7 +127,7 @@ pitch_kd: 0
 
 #####-----planner-----#####
 fire_thresh: 0.0035
-# R越大越平滑/Q越大越激进
+# R越大越平滑/Q越大越激进 TODO:
 max_yaw_acc: 50
 Q_yaw: [8e3, 0] # 8e5
 R_yaw: [100] # 1
@@ -155,4 +155,4 @@ model: "assets/yolo11_buff_int8.xml"
 fire_gap_time: 0.700   # s
 predict_time: 0.120     # s
 
-bullet_speed: 22.0  # m/s
+bullet_speed: 22.0  # m/s TODO:
