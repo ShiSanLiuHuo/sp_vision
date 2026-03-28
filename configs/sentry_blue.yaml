@@ -32,8 +32,8 @@ max_side_ratio: 1.5
 max_rectangular_error: 25 # degree
 
 #####-----tracker参数-----#####
-min_detect_count: 6
-max_temp_lost_count: 30
+min_detect_count: 1
+max_temp_lost_count: 3
 outpost_comming_angle: 70 # degree 前哨站进入视野角度
 outpost_leaving_angle: 30 # degree 前哨站离开视野角度
 outpost_max_temp_lost_count: 75
@@ -44,7 +44,7 @@ jump_confirm_count: 1
 jump_avg_alpha: 0.8  # 越大当前观测值比重越大，受噪声的影响越大
 jump_fire_cooldown: 0.05 # s 固定延时(不使用动态参数时生效)
 jump_fire_cooldown_min: 0.05 # s 低速跳变发弹延时
-jump_fire_cooldown_max: 0.20 # s 高速跳变发弹延时
+jump_fire_cooldown_max: 0.10 # s 高速跳变发弹延时 0.2
 outpost_jump_fire_cooldown: 0.08 # s 前哨站固定跳变发弹延时(不使用动态参数时生效)
 jump_fire_cooldown_speed_start: 3.0 # rad/s 低速起点
 jump_fire_cooldown_speed_end: 10.0 # rad/s 高速终点
@@ -56,7 +56,7 @@ jump_min_interval: 0.15 # s 跳变最小间隔
 #####-----aimer参数-----#####
 yaw_offset: 1.6   # degree 1.5
 pitch_offset: 7.3 # degree 2
-comming_angle: 65 # degree 55
+comming_angle: 50 # degree 55
 leaving_angle: 10 # degree 20
 comming_angle_high: 50 # degree 高速(角速度大)使用
 leaving_angle_high: 10 # degree 高速(角速度大)使用
@@ -75,7 +75,7 @@ judge_distance: 2 #距离判断阈值
 auto_fire: true # 是否由自瞄控制射击
 
 camera_name: mindvision
-exposure_ms: 5
+exposure_ms: 7
 gamma: 0.9
 gain: 0
 vid_pid: f622:d132
@@ -129,12 +129,12 @@ pitch_kd: 0
 fire_thresh: 0.0035
 # R越大越平滑/Q越大越激进
 max_yaw_acc: 50
-Q_yaw: [8e6, 0]
-R_yaw: [1]
+Q_yaw: [8e3, 0] # 8e5
+R_yaw: [100] # 1
 
 max_pitch_acc: 100
-Q_pitch: [9e6, 0]
-R_pitch: [1]
+Q_pitch: [9e5, 0] # 9e6
+R_pitch: [100] # 1
 
 #####-----cboard参数-----#####
 phoenix_angle_unit: rad   # 下位机若发送角度(度)则设为deg，发送弧度则改为rad
