@@ -59,6 +59,47 @@ YOLOV5::YOLOV5(const std::string & config_path, bool debug)
   compiled_model_ = core_.compile_model(
     model, device_, ov::hint::performance_mode(ov::hint::PerformanceMode::LATENCY));
 
+  // Startup diagnostics: print actual OpenVINO execution backend and key runtime configs
+  tools::logger()->info("OpenVINO requested device: {}", device_);
+  try {
+    auto exec_devices = compiled_model_.get_property(ov::execution_devices);
+    std::string joined;
+    for (size_t i = 0; i < exec_devices.size(); ++i) {
+      joined += exec_devices[i];
+      if (i + 1 < exec_devices.size()) joined += ",";
+    }
+    tools::logger()->info("OpenVINO execution devices: [{}]", joined);
+  } catch (const std::exception & e) {
+    tools::logger()->warn("OpenVINO execution devices unavailable: {}", e.what());
+  }
+
+  try {
+    auto perf_mode = compiled_model_.get_property(ov::hint::performance_mode);
+    std::string perf_mode_str = "UNKNOWN";
+    if (perf_mode == ov::hint::PerformanceMode::LATENCY) perf_mode_str = "LATENCY";
+    else if (perf_mode == ov::hint::PerformanceMode::THROUGHPUT) perf_mode_str = "THROUGHPUT";
+    else if (perf_mode == ov::hint::PerformanceMode::CUMULATIVE_THROUGHPUT) {
+      perf_mode_str = "CUMULATIVE_THROUGHPUT";
+    }
+    tools::logger()->info("OpenVINO performance mode: {}", perf_mode_str);
+  } catch (const std::exception & e) {
+    tools::logger()->warn("OpenVINO performance mode unavailable: {}", e.what());
+  }
+
+  try {
+    auto num_threads = compiled_model_.get_property(ov::inference_num_threads);
+    tools::logger()->info("OpenVINO inference_num_threads: {}", num_threads);
+  } catch (const std::exception & e) {
+    tools::logger()->warn("OpenVINO inference_num_threads unavailable: {}", e.what());
+  }
+
+  try {
+    auto num_streams = compiled_model_.get_property(ov::streams::num);
+    tools::logger()->info("OpenVINO num_streams: {}", num_streams);
+  } catch (const std::exception & e) {
+    tools::logger()->warn("OpenVINO num_streams unavailable: {}", e.what());
+  }
+
   if (async_infer_) {
     infer_thread_ = std::thread(&YOLOV5::infer_worker, this);
     tools::logger()->info("YOLOV5 async infer enabled, queue size={}", infer_queue_size_);
