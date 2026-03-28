@@ -102,15 +102,25 @@ io::Command Aimer::aim(
     double dt;
     dt = tools::delta_time(std::chrono::steady_clock::now(), timestamp) + delay_time;
     future += std::chrono::microseconds(int(dt * 1e6));
-    target.predict(future);
+    // TODO:
+    // target.predict(future);
+    for(auto & t : targets) t.predict(future);
   }
 
   else {
     auto dt = 0.005 + delay_time;  //detector-aimer耗时0.005+发弹延时0.1
     // tools::logger()->info("dt is {:.4f} second", dt);
     future += std::chrono::microseconds(int(dt * 1e6));
-    target.predict(future);
+    // TODO:
+    // target.predict(future);
+    for(auto & t : targets) t.predict(future);
   }
+
+  // // TODO:重新排序目标，使中心的板在第一个位置
+  targets.sort([](const Target & a, const Target & b) {
+    return a.armor_xyza_list()[0].norm() < b.armor_xyza_list()[0].norm();
+  });
+  target = targets.front();
 
   auto aim_point0 = choose_aim_point(target);
   debug_aim_point = aim_point0;
