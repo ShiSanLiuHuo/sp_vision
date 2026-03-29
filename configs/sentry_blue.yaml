@@ -10,8 +10,7 @@ yolov5_model_path: assets/yolov5.xml
 device: CPU
 min_confidence: 0.75
 use_traditional: true
-async_infer: true
-infer_queue_size: 2
+num_infer_requests: 1
 
 #####-----ROI-----#####
 roi: 

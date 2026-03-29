@@ -6,10 +6,8 @@
 #include <openvino/openvino.hpp>
 #include <string>
 #include <vector>
-#include <thread>
+#include <queue>
 #include <mutex>
-#include <condition_variable>
-#include <deque>
 
 #include "tasks/auto_aim/armor.hpp"
 #include "tasks/auto_aim/detector.hpp"
@@ -22,32 +20,15 @@ class YOLOV5 : public YOLOBase
 public:
   YOLOV5(const std::string & config_path, bool debug);
 
-  ~YOLOV5() override;
-
   std::list<Armor> detect(const cv::Mat & bgr_img, int frame_count) override;
 
   std::list<Armor> postprocess(
     double scale, cv::Mat & output, const cv::Mat & bgr_img, int frame_count) override;
 
 private:
-  struct InferTask
-  {
-    cv::Mat raw_img;
-    int frame_count;
-  };
-
-  struct InferResult
-  {
-    int frame_count;
-    std::list<Armor> armors;
-    cv::Mat raw_img_for_debug;
-  };
-
   std::string device_, model_path_;
   std::string save_path_, debug_path_;
   bool debug_, use_roi_, use_traditional_;
-  bool async_infer_ = true;
-  size_t infer_queue_size_ = 2;
 
   const int class_num_ = 13;
   const float nms_threshold_ = 0.3;
@@ -61,12 +42,18 @@ private:
   cv::Point2f offset_;
   cv::Mat tmp_img_;
 
-  std::thread infer_thread_;
-  std::mutex infer_mtx_;
-  std::condition_variable infer_cv_;
-  std::deque<InferTask> infer_queue_;
-  std::deque<InferResult> result_queue_;
-  bool stop_infer_thread_ = false;
+  std::vector<ov::InferRequest> infer_requests_;
+  std::queue<int> free_infer_request_indices_;
+  std::mutex request_mtx_;
+  int num_requests_ = 1;  // 根据设备性能调整并发的InferRequest数量
+
+  struct Result {
+    int frame_count;
+    std::list<Armor> armors;
+    cv::Mat img;
+  };
+  std::queue<Result> result_queue_;
+  std::mutex result_mtx_;
 
   Detector detector_;
   friend class MultiThreadDetector;
@@ -77,9 +64,7 @@ private:
   cv::Point2f get_center_norm(const cv::Mat & bgr_img, const cv::Point2f & center) const;
 
   std::list<Armor> parse(double scale, cv::Mat & output, const cv::Mat & bgr_img, int frame_count);
-
-  std::list<Armor> infer_once(const cv::Mat & raw_img, int frame_count);
-  void infer_worker();
+  void submit_request(const cv::Mat & bgr_img, int frame_count);// 提交推理请求，使用多InferRequest实现并发推理
 
   void save(const Armor & armor) const;
   void draw_detections(const cv::Mat & img, const std::list<Armor> & armors, int frame_count) const;
