@@ -81,7 +81,7 @@ void MindVision::open()
   CameraSetGamma(handle_, gamma_ * 1e2);                   // 设置伽马
   CameraSetIspOutFormat(handle_, CAMERA_MEDIA_TYPE_BGR8);  // 设置输出格式为BGR
   CameraSetTriggerMode(handle_, 0);                        // 设置为连续采集模式
-  CameraSetFrameSpeed(handle_, 1);                         // 设置为低帧率模式
+  CameraSetFrameSpeed(handle_, 2);                         // 设置为低帧率模式 应该改为2
 
   CameraPlay(handle_);
 
@@ -96,8 +96,8 @@ void MindVision::open()
 
       auto img = cv::Mat(height_, width_, CV_8UC3);
 
-  // 增加超时以容忍短暂卡顿
-  auto status = CameraGetImageBuffer(handle_, &head, &raw, 500);
+      // 增加超时以容忍短暂卡顿
+      auto status = CameraGetImageBuffer(handle_, &head, &raw, 500);
       auto timestamp = std::chrono::steady_clock::now();
 
       if (status != CAMERA_STATUS_SUCCESS) {
