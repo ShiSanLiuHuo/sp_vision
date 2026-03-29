@@ -58,7 +58,6 @@ void MindVision::read(cv::Mat & img, std::chrono::steady_clock::time_point & tim
   img = data.img;
   timestamp = data.timestamp;
 }
-
 void MindVision::open()
 {
   int camera_num = 1;

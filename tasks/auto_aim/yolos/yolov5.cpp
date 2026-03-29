@@ -115,29 +115,62 @@ YOLOV5::YOLOV5(const std::string & config_path, bool debug)
 
 std::list<Armor> YOLOV5::detect(const cv::Mat & raw_img, int frame_count)
 {
+  const auto detect_start = std::chrono::steady_clock::now();
+
+  if (frame_count < 0) {
+    return {};
+  }
+
   submit_request(raw_img, frame_count);
 
   std::list<Armor> armors;
   cv::Mat latest_img;
   int latest_frame_count = frame_count;
+  bool has_newer_result = false;
   {
     std::lock_guard<std::mutex> lock(result_mtx_);
     if (result_queue_.empty()) {
       tools::logger()->warn("Result queue is empty when trying to detect, returning empty result for frame {}", frame_count);
-      return armors;
+      return std::list<Armor>();
     }
     while (!result_queue_.empty()) {
       auto result = result_queue_.front();
       result_queue_.pop();
+
+      if (result.frame_count <= last_frame_count_) {
+        tools::logger()->warn(
+          "drop stale result frame {} (last popped frame {})",
+          result.frame_count, last_frame_count_);
+        continue;
+      }
+
+      tools::logger()->info(
+        "popped result for frame {}, infer latency: {:.3f} ms, callback process: {:.3f} ms",
+        result.frame_count, result.infer_latency_ms, result.callback_process_ms);
       armors = std::move(result.armors);
       latest_img = std::move(result.img);
       latest_frame_count = result.frame_count;
+      has_newer_result = true;
     }
+
+    if (has_newer_result) {
+      last_frame_count_ = latest_frame_count;
+    }
+  }
+
+  if (!has_newer_result) {
+    return {};
   }
 
   if(debug_ && !latest_img.empty()){
     draw_detections(latest_img, armors, latest_frame_count);
   }
+
+  const auto detect_end = std::chrono::steady_clock::now();
+  const auto detect_total_ms =
+    std::chrono::duration_cast<std::chrono::nanoseconds>(detect_end - detect_start).count() /
+    1000000.0;
+  tools::logger()->info("detect total time for frame {}: {:.3f} ms", frame_count, detect_total_ms);
 
   return armors;
 }
@@ -235,6 +268,7 @@ std::list<Armor> YOLOV5::parse(
 
 void YOLOV5::submit_request(const cv::Mat & raw_img, int frame_count)
 {
+  const auto submit_start = std::chrono::steady_clock::now();
   if (raw_img.empty()) return;
 
   // Snapshot at submit time to avoid later in-place drawing (tracker overlays) corrupting detection draw
@@ -251,6 +285,7 @@ void YOLOV5::submit_request(const cv::Mat & raw_img, int frame_count)
   free_infer_request_indices_.pop();
   }
 
+  tools::logger()->info("Submitting inference request {}, frame {}", request_index, frame_count);
   auto infer_request = infer_requests_[request_index];
 
   // roi
@@ -280,7 +315,10 @@ void YOLOV5::submit_request(const cv::Mat & raw_img, int frame_count)
   ov::Tensor input_tensor(ov::element::u8, {1, 640, 640, 3}, input.data);
   infer_request.set_input_tensor(input_tensor);
 
-  infer_request.set_callback([this, request_index, input, raw_img_snapshot, bgr_img, frame_count, scale](std::exception_ptr ex) {
+  infer_request.set_callback([this, request_index, input, raw_img_snapshot, bgr_img, frame_count, scale,
+                              submit_start](std::exception_ptr ex) {
+    const auto callback_start = std::chrono::steady_clock::now();
+
     if (!ex) {
       auto output_tensor = infer_requests_[request_index].get_output_tensor();
       auto output_shape = output_tensor.get_shape();
@@ -294,8 +332,26 @@ void YOLOV5::submit_request(const cv::Mat & raw_img, int frame_count)
           result_queue_.pop();
           return;
         }
+        const auto callback_end = std::chrono::steady_clock::now();
+        const auto infer_latency_ms =
+          std::chrono::duration_cast<std::chrono::nanoseconds>(callback_end - submit_start).count() /
+          1000000.0;
+        const auto callback_process_ms =
+          std::chrono::duration_cast<std::chrono::nanoseconds>(callback_end - callback_start).count() /
+          1000000.0;
+
+        tools::logger()->info(
+          "infer done request {}, frame {}, infer latency: {:.3f} ms, callback process: {:.3f} ms",
+          request_index, frame_count, infer_latency_ms, callback_process_ms);
+
         // Keep original frame for debug drawing to avoid ROI-sized display mismatch
-        result_queue_.push({frame_count, armors, raw_img_snapshot.clone()});
+        result_queue_.push({
+          frame_count,
+          armors,
+          raw_img_snapshot.clone(),
+          infer_latency_ms,
+          callback_process_ms,
+        });
       }
     } else {
       try {
@@ -313,6 +369,14 @@ void YOLOV5::submit_request(const cv::Mat & raw_img, int frame_count)
   });
 
   infer_request.start_async();
+
+  const auto submit_end = std::chrono::steady_clock::now();
+  const auto submit_overhead_ms =
+    std::chrono::duration_cast<std::chrono::nanoseconds>(submit_end - submit_start).count() /
+    1000000.0;
+  tools::logger()->info(
+    "submitted request {}, frame {}, submit overhead: {:.3f} ms",
+    request_index, frame_count, submit_overhead_ms);
 }
 
 bool YOLOV5::check_name(const Armor & armor) const

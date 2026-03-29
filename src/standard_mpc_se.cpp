@@ -184,15 +184,13 @@ int main(int argc, char* argv[]) {
     io::Command last_command = {false, false, 0.0, 0.0, 0.0, 0.0};
     int total_armors = 0;  // 总检测到的装甲板数量
     int detected_frames = 0;  // 检测到装甲板的帧数
-    
-
 
     while (!exiter.exit()) {
         auto frame_start = std::chrono::steady_clock::now();
         auto cam_start = std::chrono::steady_clock::now();
         camera.read(img, t);
         double cam_dt = tools::delta_time(std::chrono::steady_clock::now(), cam_start);
-    // try to get latest autoaim data from ROS2; if absent, fall back to identity quaternion
+        // try to get latest autoaim data from ROS2; if absent, fall back to identity quaternion
         std::optional<io::AutoaimData> maybe = std::nullopt;
         // Subscribe2Nav exposes get_autoaim_data()
         if (nav_sub) {
@@ -231,12 +229,12 @@ int main(int argc, char* argv[]) {
         solver.set_R_gimbal2world(q);
 
         auto yolo_start    = std::chrono::steady_clock::now();
-        auto armors        = detector.detect(img);
+        auto armors        = detector.detect(img, frame_count);
         double detect_dt = tools::delta_time(std::chrono::steady_clock::now(), yolo_start);
-            total_armors += armors.size();  // 累加检测到的装甲板
-            if (!armors.empty()) {
-                detected_frames++;  // 累加检测成功的帧数
-            }
+        total_armors += armors.size();  // 累加检测到的装甲板
+        if (!armors.empty()) {
+            detected_frames++;  // 累加检测成功的帧数
+        }
         auto tracker_start = std::chrono::steady_clock::now();
         auto targets       = tracker.track(armors, t);
         double track_dt = tools::delta_time(std::chrono::steady_clock::now(), tracker_start);

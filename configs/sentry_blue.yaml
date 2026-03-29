@@ -10,7 +10,7 @@ yolov5_model_path: assets/yolov5.xml
 device: CPU
 min_confidence: 0.75
 use_traditional: true
-num_infer_requests: 1
+num_infer_requests: 4
 
 #####-----ROI-----#####
 roi: 
@@ -34,7 +34,7 @@ max_rectangular_error: 25 # degree
 
 #####-----tracker参数-----#####
 min_detect_count: 1
-max_temp_lost_count: 5 # 由于识别率很高，所以丢失就是模型错误，直接切换。思想来自SORT
+max_temp_lost_count: 5 # 由于识别率很高，所以丢失就是模型错误，直接切换。思想来自SORT ???
 outpost_comming_angle: 70 # degree 前哨站进入视野角度
 outpost_leaving_angle: 30 # degree 前哨站离开视野角度
 outpost_max_temp_lost_count: 75
@@ -76,7 +76,7 @@ judge_distance: 2 #距离判断阈值
 auto_fire: true # 是否由自瞄控制射击
 
 camera_name: mindvision
-exposure_ms: 10
+exposure_ms: 7
 gamma: 0.9
 gain: 0
 vid_pid: f622:d132

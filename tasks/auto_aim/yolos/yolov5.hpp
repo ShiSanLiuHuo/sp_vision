@@ -2,6 +2,7 @@
 #define AUTO_AIM__YOLOV5_HPP
 
 #include <list>
+#include <chrono>
 #include <opencv2/opencv.hpp>
 #include <openvino/openvino.hpp>
 #include <string>
@@ -51,9 +52,12 @@ private:
     int frame_count;
     std::list<Armor> armors;
     cv::Mat img;
+    double infer_latency_ms;
+    double callback_process_ms;
   };
   std::queue<Result> result_queue_;
   std::mutex result_mtx_;
+  int last_frame_count_ = -1;
 
   Detector detector_;
   friend class MultiThreadDetector;
