@@ -4,12 +4,35 @@
 #include <yaml-cpp/yaml.h>
 
 #include <filesystem>
+#include <fstream>
 
 #include "tools/img_tools.hpp"
 #include "tools/logger.hpp"
 
 namespace auto_aim
 {
+namespace
+{
+void append_frame_delta_log(int incoming_frame_count, int popped_frame_count, bool accepted)
+{
+  try {
+    std::filesystem::create_directories("records");
+    std::ofstream ofs("records/frame_count_delta.txt", std::ios::app);
+    if (!ofs.is_open()) {
+      tools::logger()->warn("failed to open records/frame_count_delta.txt");
+      return;
+    }
+    const int delta = popped_frame_count - incoming_frame_count;
+    ofs << fmt::format(
+      "{:%Y-%m-%d %H:%M:%S} incoming={} popped={} delta={} accepted={}\n",
+      std::chrono::system_clock::now(), incoming_frame_count, popped_frame_count, delta,
+      accepted ? 1 : 0);
+  } catch (const std::exception & e) {
+    tools::logger()->warn("failed to write frame_count delta log: {}", e.what());
+  }
+}
+}  // namespace
+
 YOLOV5::YOLOV5(const std::string & config_path, bool debug)
 : debug_(debug), detector_(config_path, false)
 {
@@ -125,8 +148,8 @@ std::list<Armor> YOLOV5::detect(const cv::Mat & raw_img, int frame_count)
 
   std::list<Armor> armors;
   cv::Mat latest_img;
-  int latest_frame_count = frame_count;
   bool has_newer_result = false;
+  int latest_frame_count = last_frame_count_;
   {
     std::lock_guard<std::mutex> lock(result_mtx_);
     if (result_queue_.empty()) {
@@ -137,12 +160,15 @@ std::list<Armor> YOLOV5::detect(const cv::Mat & raw_img, int frame_count)
       auto result = result_queue_.front();
       result_queue_.pop();
 
-      if (result.frame_count <= last_frame_count_) {
+      if (result.frame_count <= latest_frame_count) {
+        append_frame_delta_log(frame_count, result.frame_count, false);
         tools::logger()->warn(
-          "drop stale result frame {} (last popped frame {})",
-          result.frame_count, last_frame_count_);
+          "drop stale result frame {} (accepted watermark frame {})",
+          result.frame_count, latest_frame_count);
         continue;
       }
+
+      append_frame_delta_log(frame_count, result.frame_count, true);
 
       tools::logger()->info(
         "popped result for frame {}, infer latency: {:.3f} ms, callback process: {:.3f} ms",

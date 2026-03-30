@@ -98,9 +98,9 @@ io::Command Aimer::aim(
 
   // 考虑detecor和tracker所消耗的时间，此外假设aimer的用时可忽略不计
   auto future = timestamp;
-  if (to_now) {
+  if (to_now) { // to_now=true
     double dt;
-    dt = tools::delta_time(std::chrono::steady_clock::now(), timestamp) + delay_time;
+    dt = tools::delta_time(std::chrono::steady_clock::now(), timestamp) * 2 + delay_time; // TODO:测试参数，计算异步推理的延迟
     future += std::chrono::microseconds(int(dt * 1e6));
     // TODO:
     // target.predict(future);

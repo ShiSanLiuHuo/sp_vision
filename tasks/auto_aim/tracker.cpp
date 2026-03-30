@@ -77,6 +77,7 @@ std::list<Target> Tracker::track(
   std::list<Armor> & armors, std::chrono::steady_clock::time_point t, bool use_enemy_color)
 {
   auto dt = tools::delta_time(t, last_timestamp_);
+  tools::logger()->debug("[Tracker] dt: {:.3f}s", dt);
   last_timestamp_ = t;
 
   // 时间间隔过长，说明可能发生了相机离线
