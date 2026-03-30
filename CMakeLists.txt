@@ -86,6 +86,7 @@ add_executable(usbcamera_test tests/usbcamera_test.cpp)
 add_executable(handeye_test tests/handeye_test.cpp)
 add_executable(dm_test tests/dm_test.cpp)
 add_executable(minimum_vision_system tests/minimum_vision_system.cpp)
+add_executable(frame_delta_stats tests/frame_delta_stats.cpp)
 
 add_executable(shoot_video tests/shoot_video.cpp)
 add_executable(play_loop tests/play_loop.cpp)
