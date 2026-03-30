@@ -128,14 +128,14 @@ pitch_kd: 0
 
 #####-----planner-----#####
 fire_thresh: 0.0035
-# R越大越平滑/Q越大越激进 TODO:
+# R越大越平滑/Q越大越激进 TODO:不能改啊！！！！！！
 max_yaw_acc: 50
-Q_yaw: [8e3, 0] # 8e5
-R_yaw: [100] # 1
+Q_yaw: [8e5, 0] # 8e5
+R_yaw: [1] # 1
 
 max_pitch_acc: 100
-Q_pitch: [9e5, 0] # 9e6
-R_pitch: [100] # 1
+Q_pitch: [9e6, 0] # 9e6
+R_pitch: [1] # 1
 
 #####-----cboard参数-----#####
 phoenix_angle_unit: rad   # 下位机若发送角度(度)则设为deg，发送弧度则改为rad
