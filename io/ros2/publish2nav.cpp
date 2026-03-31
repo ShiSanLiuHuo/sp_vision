@@ -13,6 +13,7 @@ namespace io
 Publish2Nav::Publish2Nav() : Node("auto_aim_target_pos_publisher")
 {
   publisher_ = this->create_publisher<communicate_2025::msg::SerialInfo>("/shoot_info", 10);
+  publisher_ekf_w_ = this->create_publisher<communicate_2025::msg::EKF>("/ekf_w", 10);
 
   RCLCPP_INFO(this->get_logger(), "auto_aim_target_pos_publisher node initialized.");
 }
@@ -39,14 +40,35 @@ void Publish2Nav::send_data(const Eigen::Vector4d & target_pos)
   // 发布消息
   publisher_->publish(*message);
  
-
-
-  // 发布消息
-  publisher_->publish(*message);
+  // // 发布消息
+  // publisher_->publish(*message);
 
   // RCLCPP_INFO(
   //   this->get_logger(), "auto_aim_target_pos_publisher node sent message: '%s'",
   //   message->data.c_str());
+}
+
+void Publish2Nav::send_ekf_w(const Eigen::VectorXd & ekf_w,const int last_id)
+{
+  // 创建消息
+  auto message = std::make_shared<communicate_2025::msg::EKF>();
+
+  // 将 double 数据存储在消息中
+  message->x = static_cast<float>(ekf_w[0]);
+  message->vx = static_cast<float>(ekf_w[1]);
+  message->y = static_cast<float>(ekf_w[2]);
+  message->vy = static_cast<float>(ekf_w[3]);
+  message->z = static_cast<float>(ekf_w[4]);
+  message->vz = static_cast<float>(ekf_w[5]);
+  message->a = static_cast<float>(ekf_w[6]);
+  message->w = static_cast<float>(ekf_w[7]);
+  message->r = static_cast<float>(ekf_w[8]);
+  message->l = static_cast<float>(ekf_w[9]);
+  message->h = static_cast<float>(ekf_w[10]);
+  message->last_id = last_id;
+
+   // 发布消息
+  publisher_ekf_w_->publish(*message);
 }
 
 void Publish2Nav::start()

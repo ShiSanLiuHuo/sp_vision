@@ -10,6 +10,7 @@
 #include <string>
 
 #include "rclcpp/rclcpp.hpp"
+#include "communicate_2025/msg/ekf.hpp"
 #include "communicate_2025/msg/serial_info.hpp"
 
 namespace io
@@ -25,9 +26,12 @@ public:
 
   void send_data(const Eigen::Vector4d & data);
 
+  void send_ekf_w(const Eigen::VectorXd & ekf_w,const int last_id);
+
 private:
   // ROS2 发布者
   rclcpp::Publisher<communicate_2025::msg::SerialInfo>::SharedPtr publisher_;
+  rclcpp::Publisher<communicate_2025::msg::EKF>::SharedPtr publisher_ekf_w_;
 };
 
 }  // namespace io

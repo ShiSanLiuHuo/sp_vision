@@ -418,7 +418,13 @@ int main(int argc, char* argv[]) {
             data["h"]         = x[10];
             data["last_id"]   = target.last_id;
 
+            if(pub_node){
+                Eigen::VectorXd ekf_w = target.ekf_x();
+                pub_node->send_ekf_w(ekf_w, target.last_id);
+            }
+
             auto ekf = target.ekf();
+
 
             data["residual_yaw"]        = ekf.data.at("residual_yaw");
             data["residual_pitch"]      = ekf.data.at("residual_pitch");

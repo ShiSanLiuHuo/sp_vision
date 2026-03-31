@@ -17,6 +17,7 @@ find_package(std_msgs REQUIRED)
 rosidl_generate_interfaces(${PROJECT_NAME}
     "msg/SerialInfo.msg"
     "msg/Autoaim.msg"
+    "msg/EKF.msg"
     DEPENDENCIES
     std_msgs
 )
